@@ -160,6 +160,7 @@ struct SkyChartView: View {
             }
         }
 
+        drawOrigin(in: &context, layout: layout)
         drawLabels(in: &context, layout: layout, state: state)
     }
 
@@ -177,6 +178,46 @@ struct SkyChartView: View {
             Path(ellipseIn: rect),
             with: .color(Theme.starlight.opacity(0.10)),
             lineWidth: 1
+        )
+    }
+
+    /// The Sun at the centre — the one fixed point on the chart.
+    ///
+    /// Without it the map is a field of anonymous points with no sense of where
+    /// the viewer stands. This is home: the projection's centre is the sky
+    /// directly over the user at the moment they started, so the Sun marks
+    /// where they're looking out from.
+    private func drawOrigin(in context: inout GraphicsContext, layout: ChartLayout) {
+        let centre = layout.centrePoint
+        guard centre.x > -60, centre.x < layout.size.width + 60,
+              centre.y > -60, centre.y < layout.size.height + 60 else { return }
+
+        let sunRadius = 5.0
+        context.drawLayer { layer in
+            layer.addFilter(.blur(radius: 9))
+            layer.fill(
+                Path(ellipseIn: CGRect(
+                    x: centre.x - sunRadius * 3, y: centre.y - sunRadius * 3,
+                    width: sunRadius * 6, height: sunRadius * 6
+                )),
+                with: .color(Color(red: 1, green: 0.84, blue: 0.42).opacity(0.5))
+            )
+        }
+        context.fill(
+            Path(ellipseIn: CGRect(
+                x: centre.x - sunRadius, y: centre.y - sunRadius,
+                width: sunRadius * 2, height: sunRadius * 2
+            )),
+            with: .color(Color(red: 1, green: 0.95, blue: 0.80))
+        )
+
+        let label = Text("the Sun")
+            .font(.caption2)
+            .foregroundStyle(Theme.subdued)
+        context.draw(
+            context.resolve(label),
+            at: CGPoint(x: centre.x, y: centre.y + 20),
+            anchor: .center
         )
     }
 

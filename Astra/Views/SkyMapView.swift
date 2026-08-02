@@ -27,11 +27,15 @@ struct SkyMapView: View {
         progression.completed(awardCount: awards.count).count
     }
 
-    /// How far out the user has reached, in degrees from where they started.
-    private var reach: Double {
-        progression.litStars(awardCount: awards.count)
-            .map { SkyMath.angularSeparation(progression.anchor, $0.constellation.center) }
-            .max() ?? 0
+    /// Share of the reachable sky finished.
+    ///
+    /// This replaced a "degrees reached" figure, which was honest only while
+    /// the progression ran outward from the anchor. Now that figures unlock
+    /// smallest-first they land all over the sky, and the furthest one says
+    /// nothing about how much has been done.
+    private var skyShare: Double {
+        guard !progression.constellations.isEmpty else { return 0 }
+        return Double(completedCount) / Double(progression.constellations.count)
     }
 
     var body: some View {
@@ -77,7 +81,10 @@ struct SkyMapView: View {
                 divider
                 statTile(value: "\(completedCount)", label: completedCount == 1 ? "figure done" : "figures done")
                 divider
-                statTile(value: "\(Int(reach.rounded()))°", label: "reached")
+                statTile(
+                    value: skyShare.formatted(.percent.precision(.fractionLength(0))),
+                    label: "of the sky"
+                )
             }
             .padding(.vertical, 12)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
@@ -158,47 +165,54 @@ struct StarDetailSheet: View {
     let litOn: DayKey?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 14) {
-                StarDot(
-                    color: Theme.starColor(bv: star.colorIndex),
-                    radius: Theme.starRadius(magnitude: star.magnitude),
-                    isLit: isLit
-                )
-                VStack(alignment: .leading, spacing: 2) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                // The portrait leads. A star you've earned should look like a
+                // star, not like a bullet point.
+                StarPortrait(star: star, diameter: 190)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 240)
+                    // Unlit stars are shown as they *will* look, dimmed —
+                    // something to walk towards rather than a blank.
+                    .opacity(isLit ? 1 : 0.35)
+                    .saturation(isLit ? 1 : 0.5)
+
+                VStack(alignment: .leading, spacing: 3) {
                     Text(star.displayName)
-                        .font(.title2.weight(.semibold))
+                        .font(.title.weight(.semibold))
                         .foregroundStyle(Theme.starlight)
                     if let bayer = star.bayer, star.name != nil {
                         Text(bayer)
                             .font(.subheadline)
                             .foregroundStyle(Theme.subdued)
                     }
+                    if let litOn {
+                        Text("Lit on \(litOn.date().formatted(.dateTime.month(.wide).day()))")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.subdued)
+                            .padding(.top, 4)
+                    } else if !isLit {
+                        Text("Not yet lit")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.subdued)
+                            .padding(.top, 4)
+                    }
                 }
-            }
 
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(factLines, id: \.self) { line in
-                    Text(line)
-                        .font(.callout)
-                        .foregroundStyle(Theme.starlight.opacity(0.85))
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(factLines, id: \.self) { line in
+                        Text(line)
+                            .font(.callout)
+                            .foregroundStyle(Theme.starlight.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-            }
 
-            if let litOn {
-                Text("Lit on \(litOn.date().formatted(.dateTime.month(.wide).day()))")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.subdued)
-            } else if !isLit {
-                Text("Not yet lit")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.subdued)
+                StarScaleComparison(star: star)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(24)
         .background(Theme.background)
     }
 

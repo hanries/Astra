@@ -38,7 +38,13 @@ enum Theme {
     /// at −0.03 is blue-white, the Sun at 0.65 is yellow-white, Betelgeuse at
     /// 1.85 is orange-red. Stars without an index render as plain starlight.
     static func starColor(bv: Double?) -> Color {
-        guard let bv else { return starlight }
+        let (r, g, b) = starRGB(bv: bv)
+        return Color(red: r, green: g, blue: b)
+    }
+
+    /// The same colour as raw components, for handing to a Metal shader.
+    static func starRGB(bv: Double?) -> (Double, Double, Double) {
+        guard let bv else { return (0.93, 0.94, 0.97) }
         let anchors: [(Double, (Double, Double, Double))] = [
             (-0.30, (0.61, 0.72, 1.00)),
             ( 0.00, (0.78, 0.84, 1.00)),
@@ -53,13 +59,13 @@ enum Theme {
             let (b0, c0) = anchors[i - 1]
             let (b1, c1) = anchors[i]
             let t = (clamped - b0) / (b1 - b0)
-            return Color(
-                red: c0.0 + (c1.0 - c0.0) * t,
-                green: c0.1 + (c1.1 - c0.1) * t,
-                blue: c0.2 + (c1.2 - c0.2) * t
+            return (
+                c0.0 + (c1.0 - c0.0) * t,
+                c0.1 + (c1.1 - c0.1) * t,
+                c0.2 + (c1.2 - c0.2) * t
             )
         }
-        return starlight
+        return (0.93, 0.94, 0.97)
     }
 
     /// A star's rendered radius in points, from its magnitude. Brighter is

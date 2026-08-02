@@ -48,6 +48,77 @@ struct Star: Identifiable, Hashable, Sendable, Decodable {
         SkyMath.riseSet(declination: coordinate.declination, latitude: latitude) != .neverRises
     }
 
+    // MARK: - Physical character
+
+    /// Harvard spectral class — O, B, A, F, G, K or M, hottest to coolest.
+    var spectralClass: Character? {
+        spectralType?.first { "OBAFGKM".contains($0) }
+    }
+
+    /// How swollen the star is, from the Roman numeral in its spectral type.
+    enum LuminosityClass: String, Sendable {
+        case supergiant = "I"
+        case brightGiant = "II"
+        case giant = "III"
+        case subgiant = "IV"
+        case mainSequence = "V"
+
+        /// Rough multiplier on a main-sequence star of the same class.
+        var radiusFactor: Double {
+            switch self {
+            case .supergiant:   180
+            case .brightGiant:   45
+            case .giant:         18
+            case .subgiant:       2.5
+            case .mainSequence:   1
+            }
+        }
+    }
+
+    /// Parsed from the spectral type. Longest numeral first, or `III` reads as
+    /// `I` and every giant becomes a supergiant.
+    var luminosityClass: LuminosityClass? {
+        guard let spectralType else { return nil }
+        // Skip the leading class letter and temperature digits before looking
+        // for numerals, so the `I` in a peculiarity suffix isn't picked up.
+        for candidate: LuminosityClass in [.giant, .subgiant, .brightGiant, .mainSequence, .supergiant] {
+            if spectralType.contains(candidate.rawValue) { return candidate }
+        }
+        return nil
+    }
+
+    /// Radius in solar radii, approximated from spectral and luminosity class.
+    ///
+    /// An estimate, not a measurement — the catalogue carries no radii, and
+    /// these come from the standard class averages. Good enough to show that
+    /// Betelgeuse would swallow the inner solar system and Sirius wouldn't,
+    /// which is the only claim the comparison view makes.
+    var approximateSolarRadii: Double? {
+        guard let spectralClass else { return nil }
+        let mainSequence: Double = switch spectralClass {
+        case "O": 8
+        case "B": 4
+        case "A": 1.8
+        case "F": 1.3
+        case "G": 1.0
+        case "K": 0.8
+        default:  0.4       // M
+        }
+        return mainSequence * (luminosityClass?.radiusFactor ?? 1)
+    }
+
+    /// How coarse the convection cells look, 0...1.
+    ///
+    /// Cool stars have deep convection zones and correspondingly huge
+    /// granules — the Sun's are about 1,000 km across, a red supergiant's can
+    /// be a sizeable fraction of the whole star. Hot stars have radiative
+    /// envelopes and much finer surface structure.
+    var granulationCoarseness: Double {
+        guard let kelvin = temperatureKelvin else { return 0.5 }
+        // 3,000 K reads as fully coarse, 12,000 K as nearly smooth.
+        return max(0.08, min(1, (12_000 - kelvin) / 9_000))
+    }
+
     private enum CodingKeys: String, CodingKey {
         case hr, constellation, ra, dec, magnitude, bayer, name, bv, spectral, ly
     }

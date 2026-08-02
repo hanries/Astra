@@ -148,7 +148,7 @@ struct StarCatalogTests {
     @Test func orderingExcludesWhatNeverRises() throws {
         let catalog = try loadCatalog()
         let london = ObserverPosition(latitude: 51.5, longitude: -0.13)
-        let order = catalog.constellationsOutward(from: london, at: .now)
+        let order = catalog.constellationsBySize(from: london, at: .now)
 
         #expect(!order.contains { $0.abbreviation == "Cru" }, "Crux never rises from London")
         #expect(order.contains { $0.abbreviation == "UMa" })
@@ -157,41 +157,84 @@ struct StarCatalogTests {
     @Test func hemispheresGetDifferentSkies() throws {
         let catalog = try loadCatalog()
         let sydney = ObserverPosition(latitude: -33.87, longitude: 151.21)
-        let order = catalog.constellationsOutward(from: sydney, at: .now)
+        let order = catalog.constellationsBySize(from: sydney, at: .now)
 
         #expect(order.contains { $0.abbreviation == "Cru" })
         #expect(!order.contains { $0.abbreviation == "UMi" }, "Ursa Minor never rises from Sydney")
     }
 
-    @Test func orderingStartsOverheadAndMovesOutward() throws {
+    /// Figures get bigger as you go, never smaller. This is the pacing rule:
+    /// the first constellations finish in a couple of days while the habit is
+    /// still fragile, and a fortnight-long figure only arrives once someone has
+    /// shown they'll come back.
+    @Test func orderingGrowsFromSmallFiguresToLarge() throws {
         let catalog = try loadCatalog()
         let position = ObserverPosition(latitude: 40.71, longitude: -74.01)
         let when = Date(timeIntervalSince1970: 946_728_000)
-        let order = catalog.constellationsOutward(from: position, at: when)
+        let order = catalog.constellationsBySize(from: position, at: when)
 
+        let counts = order.map(\.starCount)
+        #expect(counts == counts.sorted(), "figure sizes are not monotonic")
+        #expect(try #require(counts.first) <= 3, "the sky opens on something too big")
+        #expect(try #require(counts.last) >= 8, "nothing substantial to work towards")
+    }
+
+    /// Among equally sized figures, the nearest overhead comes first — so the
+    /// sky still fills roughly outward from where the user was standing.
+    @Test func equallySizedFiguresAreOrderedByNearness() throws {
+        let catalog = try loadCatalog()
+        let position = ObserverPosition(latitude: 40.71, longitude: -74.01)
+        let when = Date(timeIntervalSince1970: 946_728_000)
+        let order = catalog.constellationsBySize(from: position, at: when)
         let zenith = SkyMath.zenith(for: position, at: when)
-        let separations = order.map { SkyMath.angularSeparation(zenith, $0.center) }
-        #expect(separations == separations.sorted())
-        #expect(try #require(separations.first) < 25, "nothing was near the zenith")
+
+        for (size, group) in Dictionary(grouping: order, by: \.starCount) where group.count > 1 {
+            let separations = group.map { SkyMath.angularSeparation(zenith, $0.center) }
+            #expect(separations == separations.sorted(),
+                    "\(size)-star figures are not ordered by nearness")
+        }
     }
 
     @Test func orderingIsReproducible() throws {
         let catalog = try loadCatalog()
         let position = ObserverPosition(latitude: 35.68, longitude: 139.65)
         let when = Date(timeIntervalSince1970: 946_728_000)
-        let first = catalog.constellationsOutward(from: position, at: when).map(\.abbreviation)
-        let second = catalog.constellationsOutward(from: position, at: when).map(\.abbreviation)
+        let first = catalog.constellationsBySize(from: position, at: when).map(\.abbreviation)
+        let second = catalog.constellationsBySize(from: position, at: when).map(\.abbreviation)
         #expect(first == second)
     }
 
-    /// Pacing comes from the real sky rather than a fixed counter, so the
-    /// figures need to be in a usable range — not one star, not forty.
-    @Test func constellationsTakeAReasonableNumberOfDays() throws {
+    /// A constellation's stars are the ones its figure is drawn from, so
+    /// finishing one finishes a shape you can see. Ursa Major is the Plough's
+    /// seven, not the twenty-nine catalogued inside its boundary.
+    @Test func constellationsHoldOnlyTheirFigureStars() throws {
+        let catalog = try loadCatalog()
+
+        let ursaMajor = try #require(catalog.constellation("UMa"))
+        #expect(ursaMajor.starCount == 7, "the Plough has seven stars")
+
+        let orion = try #require(catalog.constellation("Ori"))
+        #expect(orion.starCount == 7)
+
+        // Every star in a figure must appear in one of that figure's edges.
+        for constellation in catalog.constellations {
+            let edges = catalog.figures[constellation.abbreviation] ?? []
+            let endpoints = Set(edges.flatMap { [$0.0, $0.1] })
+            for star in constellation.stars {
+                #expect(endpoints.contains(star.hr),
+                        "\(star.displayName) isn't on any \(constellation.name) line")
+            }
+        }
+    }
+
+    /// Pacing lands where the design wants it: a couple of days at the start,
+    /// a fortnight at the far end, and nothing absurd in between.
+    @Test func figuresTakeBetweenTwoAndTwentyDays() throws {
         let catalog = try loadCatalog()
         let position = ObserverPosition(latitude: 40, longitude: 0)
-        let order = catalog.constellationsOutward(from: position, at: .now)
-        for constellation in order.prefix(20) {
-            #expect(constellation.starCount >= 3, "\(constellation.name) has too few stars")
+        for constellation in catalog.constellationsBySize(from: position, at: .now) {
+            #expect((2...20).contains(constellation.starCount),
+                    "\(constellation.name) takes \(constellation.starCount) days")
         }
     }
 }

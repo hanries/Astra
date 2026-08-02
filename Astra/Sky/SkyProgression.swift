@@ -110,7 +110,7 @@ enum SkyProgressionStore {
         }
 
         let anchor = position ?? ObserverLocation.approximate() ?? fallbackPosition
-        let ordered = catalog.constellationsOutward(from: anchor, at: now)
+        let ordered = catalog.constellationsBySize(from: anchor, at: now)
         defaults.set(ordered.map(\.abbreviation), forKey: orderKey)
         return SkyProgression(constellations: ordered)
     }

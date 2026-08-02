@@ -48,13 +48,20 @@ struct StarCatalog: Sendable {
         self.figures = figures
         self.starsByHR = Dictionary(stars.map { ($0.hr, $0) }, uniquingKeysWith: { first, _ in first })
 
+        // A constellation's unlockable stars are the ones its figure is drawn
+        // from, not every star catalogued inside its boundary. The region
+        // version made Ursa Major a 29-day constellation whose extra 22 stars
+        // were invisible in the shape; the figure version is the seven of the
+        // Plough, and finishing it finishes something you can see.
         let grouped = Dictionary(grouping: stars, by: \.constellation)
         self.constellations = grouped
             .map { abbreviation, members in
-                Constellation(
+                let inFigure = Set((figures[abbreviation] ?? []).flatMap { [$0.0, $0.1] })
+                let drawn = members.filter { inFigure.contains($0.hr) }
+                return Constellation(
                     abbreviation: abbreviation,
                     name: Self.constellationNames[abbreviation] ?? abbreviation,
-                    stars: members.sorted { $0.magnitude < $1.magnitude }
+                    stars: drawn.sorted { $0.magnitude < $1.magnitude }
                 )
             }
             .sorted { $0.abbreviation < $1.abbreviation }
@@ -70,12 +77,16 @@ struct StarCatalog: Sendable {
         constellationsByAbbreviation[abbreviation]
     }
 
-    /// The order a user unlocks the sky in: whatever is overhead first, then
-    /// outward by angular distance.
+    /// The order a user unlocks the sky in: small figures first, growing.
     ///
-    /// Constellations can't be ordered by how far away they are — Orion's stars
-    /// run from 250 to 1,300 light-years, so distance tears every figure apart.
-    /// "Outward" has to mean outward across the sky from directly above you.
+    /// Sorted by how many stars a figure has, so the opening constellations
+    /// finish in two or three days and later ones ask for a fortnight. Early
+    /// wins arrive while the habit is still fragile, and the commitment each
+    /// figure asks for grows with the user's ability to meet it.
+    ///
+    /// Ties break on angular distance from the zenith, so among equally sized
+    /// figures the nearest overhead comes first — the sky still fills roughly
+    /// outward from where the user was standing, and the order is reproducible.
     ///
     /// Anything that never rises from this latitude is dropped, so a user is
     /// never given a target they can't go outside and look at.
@@ -83,10 +94,10 @@ struct StarCatalog: Sendable {
     /// Compute once and store the result: the zenith moves hourly and the sky
     /// turns through the year, so recomputing later would reshuffle a
     /// progression the user is partway through.
-    func constellationsOutward(
+    func constellationsBySize(
         from position: ObserverPosition,
         at date: Date,
-        minimumStars: Int = 3
+        minimumStars: Int = 2
     ) -> [Constellation] {
         let zenith = SkyMath.zenith(for: position, at: date)
 
@@ -99,11 +110,11 @@ struct StarCatalog: Sendable {
         }
 
         reachable.sort { left, right in
-            // Ties broken by abbreviation so the order is reproducible.
-            if left.separation == right.separation {
-                return left.constellation.abbreviation < right.constellation.abbreviation
-            }
-            return left.separation < right.separation
+            let leftCount = left.constellation.starCount
+            let rightCount = right.constellation.starCount
+            if leftCount != rightCount { return leftCount < rightCount }
+            if left.separation != right.separation { return left.separation < right.separation }
+            return left.constellation.abbreviation < right.constellation.abbreviation
         }
         return reachable.map(\.constellation)
     }
