@@ -12,6 +12,9 @@ enum StarCatalogError: Error {
 struct StarCatalog: Sendable {
     let stars: [Star]
     let constellations: [Constellation]
+    /// Figure lines per constellation, as pairs of catalogue numbers. Drawing
+    /// convention rather than measurement — see `Tools/build_catalog.py`.
+    let figures: [String: [(Int, Int)]]
 
     private let starsByHR: [Int: Star]
     private let constellationsByAbbreviation: [String: Constellation]
@@ -29,13 +32,20 @@ struct StarCatalog: Sendable {
     }
 
     init(data: Data) throws {
-        struct Payload: Decodable { let stars: [Star] }
+        struct Payload: Decodable {
+            let stars: [Star]
+            let figures: [String: [[Int]]]?
+        }
         let decoded = try JSONDecoder().decode(Payload.self, from: data)
-        self.init(stars: decoded.stars)
+        let figures = (decoded.figures ?? [:]).mapValues { edges in
+            edges.compactMap { $0.count == 2 ? ($0[0], $0[1]) : nil }
+        }
+        self.init(stars: decoded.stars, figures: figures)
     }
 
-    init(stars: [Star]) {
+    init(stars: [Star], figures: [String: [(Int, Int)]] = [:]) {
         self.stars = stars
+        self.figures = figures
         self.starsByHR = Dictionary(stars.map { ($0.hr, $0) }, uniquingKeysWith: { first, _ in first })
 
         let grouped = Dictionary(grouping: stars, by: \.constellation)

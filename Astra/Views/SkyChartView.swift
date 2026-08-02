@@ -1,0 +1,314 @@
+import SwiftUI
+
+/// The whole sky on one chart, drawn from the catalogue.
+///
+/// Every bundled star is here at its real position, sized by magnitude and
+/// coloured by its measured B−V index. Lit stars burn; the rest wait as faint
+/// grey points, so what the user has earned reads against everything they
+/// haven't.
+///
+/// The chart is centred on the anchor their progression was frozen from, in an
+/// azimuthal equidistant projection — so radius from the centre is angular
+/// distance from where they started, which is exactly the order things unlock
+/// in. The lit region grows as a disc.
+struct SkyChartView: View {
+    let progression: SkyProgression
+    let catalog: StarCatalog
+    let litCount: Int
+    var onSelectStar: ((Star) -> Void)?
+
+    @State private var zoom: CGFloat = 1
+    @State private var committedZoom: CGFloat = 1
+    @State private var pan: CGSize = .zero
+    @State private var committedPan: CGSize = .zero
+    /// Set once a touch travels far enough to be a drag rather than a tap.
+    @State private var isDragging = false
+
+    /// True when the view has been moved off its starting framing, which is the
+    /// only time the recentre control is worth showing.
+    private var isOffCentre: Bool {
+        committedPan != .zero || committedZoom != 1
+    }
+
+    /// Half-width of the chart in degrees at zoom 1 — the whole visible sky
+    /// plus a little rim.
+    private static let baseSpanDegrees: Double = 110
+    private static let zoomRange: ClosedRange<CGFloat> = 0.7...12
+
+    /// Stars already lit, by catalogue number, and the frontier radius.
+    private var litState: LitState {
+        var hrs = Set<Int>()
+        var reach = 0.0
+        let centre = progression.anchor
+        for entry in progression.litStars(awardCount: litCount) {
+            for star in entry.constellation.stars.prefix(entry.litCount) {
+                hrs.insert(star.hr)
+            }
+            reach = max(reach, SkyMath.angularSeparation(centre, entry.constellation.center))
+        }
+        return LitState(hrs: hrs, reach: reach)
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let state = litState
+            let layout = ChartLayout(
+                size: geometry.size,
+                centre: progression.anchor,
+                spanDegrees: Self.baseSpanDegrees / Double(committedZoom * zoom),
+                pan: CGSize(
+                    width: committedPan.width + pan.width,
+                    height: committedPan.height + pan.height
+                )
+            )
+
+            ZStack(alignment: .bottomTrailing) {
+                Canvas(rendersAsynchronously: true) { context, size in
+                    draw(in: &context, size: size, layout: layout, state: state)
+                }
+                .background(Theme.background)
+                .contentShape(Rectangle())
+                .gesture(
+                    SimultaneousGesture(
+                        panAndTapGesture(layout: layout),
+                        magnifyGesture
+                    )
+                )
+
+                if isOffCentre {
+                    Button {
+                        withAnimation(.spring(duration: 0.4)) {
+                            committedPan = .zero
+                            committedZoom = 1
+                            pan = .zero
+                            zoom = 1
+                        }
+                    } label: {
+                        Label("Recentre", systemImage: "scope")
+                            .font(.footnote)
+                            .labelStyle(.iconOnly)
+                            .frame(width: 40, height: 40)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                    .tint(Theme.starlight)
+                    .padding(20)
+                    .transition(.opacity)
+                }
+            }
+        }
+    }
+
+    private struct LitState {
+        let hrs: Set<Int>
+        /// How far out, in degrees, the user has reached.
+        let reach: Double
+    }
+
+    // MARK: - Drawing
+
+    private func draw(
+        in context: inout GraphicsContext,
+        size: CGSize,
+        layout: ChartLayout,
+        state: LitState
+    ) {
+        drawFrontier(in: &context, layout: layout, reach: state.reach)
+        drawFigures(in: &context, layout: layout, state: state)
+
+        // Unlit stars first, as a flat wash — no glow, so 1,500 of them stay
+        // cheap and stay quiet.
+        for star in catalog.stars where !state.hrs.contains(star.hr) {
+            guard let point = layout.point(for: star.coordinate) else { continue }
+            let radius = Theme.starRadius(magnitude: star.magnitude) * 0.55
+            context.fill(
+                Path(ellipseIn: CGRect(
+                    x: point.x - radius, y: point.y - radius,
+                    width: radius * 2, height: radius * 2
+                )),
+                with: .color(Theme.unlit.opacity(0.55))
+            )
+        }
+
+        // All the glow in one blurred layer rather than one per star, which is
+        // the difference between a smooth chart and a slideshow.
+        let lit = catalog.stars.filter { state.hrs.contains($0.hr) }
+        if !lit.isEmpty {
+            context.drawLayer { layer in
+                layer.addFilter(.blur(radius: 7))
+                for star in lit {
+                    guard let point = layout.point(for: star.coordinate) else { continue }
+                    let radius = Theme.starRadius(magnitude: star.magnitude) * 1.7
+                    layer.fill(
+                        Path(ellipseIn: CGRect(
+                            x: point.x - radius, y: point.y - radius,
+                            width: radius * 2, height: radius * 2
+                        )),
+                        with: .color(Theme.starColor(bv: star.colorIndex).opacity(0.55))
+                    )
+                }
+            }
+            for star in lit {
+                guard let point = layout.point(for: star.coordinate) else { continue }
+                let radius = Theme.starRadius(magnitude: star.magnitude)
+                context.fill(
+                    Path(ellipseIn: CGRect(
+                        x: point.x - radius, y: point.y - radius,
+                        width: radius * 2, height: radius * 2
+                    )),
+                    with: .color(Theme.starColor(bv: star.colorIndex))
+                )
+            }
+        }
+
+        drawLabels(in: &context, layout: layout, state: state)
+    }
+
+    /// A soft ring at the edge of what's been reached — the visible boundary of
+    /// the user's sky, and the thing that grows.
+    private func drawFrontier(in context: inout GraphicsContext, layout: ChartLayout, reach: Double) {
+        guard reach > 0 else { return }
+        let radius = reach * layout.pointsPerDegree
+        let centre = layout.centrePoint
+        let rect = CGRect(
+            x: centre.x - radius, y: centre.y - radius,
+            width: radius * 2, height: radius * 2
+        )
+        context.stroke(
+            Path(ellipseIn: rect),
+            with: .color(Theme.starlight.opacity(0.10)),
+            lineWidth: 1
+        )
+    }
+
+    /// Figure lines, drawn only where both ends are lit. A half-finished
+    /// constellation shows the lines it has earned and no more, so the shape
+    /// assembles as you go.
+    private func drawFigures(in context: inout GraphicsContext, layout: ChartLayout, state: LitState) {
+        for (_, edges) in catalog.figures {
+            for edge in edges {
+                guard state.hrs.contains(edge.0), state.hrs.contains(edge.1),
+                      let a = catalog.star(hr: edge.0), let b = catalog.star(hr: edge.1),
+                      let from = layout.point(for: a.coordinate),
+                      let to = layout.point(for: b.coordinate) else { continue }
+                var path = Path()
+                path.move(to: from)
+                path.addLine(to: to)
+                context.stroke(path, with: .color(Theme.starlight.opacity(0.28)), lineWidth: 0.8)
+            }
+        }
+    }
+
+    /// Constellation names, but only when zoomed in far enough that they'd fit
+    /// and only for figures the user has started. Labels at full-sky zoom are
+    /// just noise.
+    private func drawLabels(in context: inout GraphicsContext, layout: ChartLayout, state: LitState) {
+        guard layout.pointsPerDegree > 6 else { return }
+        for entry in progression.litStars(awardCount: litCount) {
+            guard let point = layout.point(for: entry.constellation.center) else { continue }
+            let text = Text(entry.constellation.name)
+                .font(.caption2)
+                .foregroundStyle(Theme.subdued.opacity(0.8))
+            context.draw(context.resolve(text), at: point, anchor: .center)
+        }
+    }
+
+    // MARK: - Interaction
+
+    /// Pan and tap from one gesture.
+    ///
+    /// A separate `onTapGesture` alongside a `DragGesture` doesn't work here:
+    /// the drag claims the touch and the tap never arrives. Instead this uses a
+    /// zero-distance drag and decides at the end — under the slop threshold it
+    /// was a tap, past it a pan.
+    private func panAndTapGesture(layout: ChartLayout) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if !isDragging,
+                   hypot(value.translation.width, value.translation.height) > Self.dragSlop {
+                    isDragging = true
+                }
+                if isDragging { pan = value.translation }
+            }
+            .onEnded { value in
+                if isDragging {
+                    committedPan.width += value.translation.width
+                    committedPan.height += value.translation.height
+                } else if let star = nearestStar(to: value.startLocation, layout: layout) {
+                    onSelectStar?(star)
+                }
+                pan = .zero
+                isDragging = false
+            }
+    }
+
+    /// Points of travel before a touch counts as a pan. Roughly a fingertip's
+    /// wobble — below this, someone meant to tap a star.
+    private static let dragSlop: CGFloat = 10
+
+    private var magnifyGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                // Clamp live as well as on commit, so pinching past the limit
+                // doesn't rubber-band back and lose the user's place.
+                zoom = (committedZoom * value.magnification)
+                    .clamped(to: Self.zoomRange) / committedZoom
+            }
+            .onEnded { value in
+                committedZoom = (committedZoom * value.magnification)
+                    .clamped(to: Self.zoomRange)
+                zoom = 1
+            }
+    }
+
+    private func nearestStar(to location: CGPoint, layout: ChartLayout) -> Star? {
+        var best: (Star, CGFloat)?
+        for star in catalog.stars {
+            guard let point = layout.point(for: star.coordinate) else { continue }
+            let distance = hypot(point.x - location.x, point.y - location.y)
+            if distance < 24, best == nil || distance < best!.1 {
+                best = (star, distance)
+            }
+        }
+        return best?.0
+    }
+}
+
+/// Maps sky coordinates to view coordinates for one frame.
+struct ChartLayout {
+    let size: CGSize
+    let centre: EquatorialCoordinate
+    let spanDegrees: Double
+    let pan: CGSize
+
+    var pointsPerDegree: Double {
+        Double(min(size.width, size.height)) / 2 / spanDegrees
+    }
+
+    var centrePoint: CGPoint {
+        CGPoint(x: size.width / 2 + pan.width, y: size.height / 2 + pan.height)
+    }
+
+    /// Nil when the star falls outside the drawn area, so callers skip it
+    /// rather than piling geometry off-screen.
+    func point(for coordinate: EquatorialCoordinate) -> CGPoint? {
+        let projected = SkyMath.project(coordinate, from: centre)
+        guard projected.angularDistance < 178 else { return nil }
+
+        let scale = pointsPerDegree
+        // x is flipped so east renders left, as it does overhead.
+        let point = CGPoint(
+            x: centrePoint.x - projected.x * scale,
+            y: centrePoint.y - projected.y * scale
+        )
+        let margin = 40.0
+        guard point.x > -margin, point.x < size.width + margin,
+              point.y > -margin, point.y < size.height + margin else { return nil }
+        return point
+    }
+}
+
+private extension CGFloat {
+    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+    }
+}

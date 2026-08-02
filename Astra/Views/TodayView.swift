@@ -41,6 +41,18 @@ struct TodayView: View {
             .background(Theme.background)
             .navigationTitle(Date.now.formatted(.dateTime.weekday(.wide).month().day()))
             .toolbar {
+                #if DEBUG
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu("Debug", systemImage: "ladybug") {
+                        Button("Seed 60 days") {
+                            act { try DebugSeed.fill(context: context) }
+                        }
+                        Button("Clear all", role: .destructive) {
+                            act { try DebugSeed.clear(context: context) }
+                        }
+                    }
+                }
+                #endif
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showingAddHabit = true
@@ -141,9 +153,15 @@ struct TodayView: View {
     }
 
     private func toggle(_ habit: Habit) {
+        act {
+            if try store.toggle(habit, on: today) { keptPulse += 1 }
+        }
+    }
+
+    private func act(_ work: () throws -> Void) {
         do {
-            let nowKept = try store.toggle(habit, on: today)
-            if nowKept { keptPulse += 1 }
+            try work()
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -187,6 +187,56 @@ enum SkyMath {
         return degrees(2 * asin(min(sqrt(h), 1)))
     }
 
+    // MARK: - Projection
+
+    /// A star's place on a flat chart, in degrees from the chart's centre.
+    struct ProjectedPoint: Hashable, Sendable {
+        /// Degrees east-west. Positive is left on screen, because that's where
+        /// east is when you're lying on your back looking up.
+        var x: Double
+        /// Degrees north-south. Positive is up.
+        var y: Double
+        /// Great-circle degrees from the centre. Equals `hypot(x, y)`.
+        var angularDistance: Double
+    }
+
+    /// Azimuthal equidistant projection about an arbitrary centre.
+    ///
+    /// Chosen over stereographic or gnomonic because distance from the centre
+    /// of the chart *is* angular distance from the anchor — and since the
+    /// unlock order is itself sorted by angular distance from the anchor, a
+    /// user's lit region grows as a filled disc spreading outward. The map
+    /// explains the progression without a legend.
+    ///
+    /// Everything within 180° projects, so the entire sphere fits on one chart,
+    /// with the antipode smeared around the rim. That distortion is real but
+    /// lands where nothing is yet unlocked.
+    static func project(
+        _ coordinate: EquatorialCoordinate,
+        from center: EquatorialCoordinate
+    ) -> ProjectedPoint {
+        let dec = radians(coordinate.declination)
+        let dec0 = radians(center.declination)
+        let deltaRA = radians(coordinate.rightAscension - center.rightAscension)
+
+        let cosC = sin(dec0) * sin(dec) + cos(dec0) * cos(dec) * cos(deltaRA)
+        let c = acos(min(max(cosC, -1), 1))
+
+        // At the centre itself the bearing is undefined and the radius is zero.
+        guard c > 1e-9 else { return ProjectedPoint(x: 0, y: 0, angularDistance: 0) }
+
+        let bearing = atan2(
+            sin(deltaRA) * cos(dec),
+            cos(dec0) * sin(dec) - sin(dec0) * cos(dec) * cos(deltaRA)
+        )
+        let radius = degrees(c)
+        return ProjectedPoint(
+            x: radius * sin(bearing),
+            y: radius * cos(bearing),
+            angularDistance: radius
+        )
+    }
+
     /// The point directly overhead for an observer at a given moment.
     static func zenith(for position: ObserverPosition, at date: Date) -> EquatorialCoordinate {
         EquatorialCoordinate(

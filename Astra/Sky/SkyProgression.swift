@@ -16,6 +16,14 @@ struct SkyProgression: Sendable {
     let constellations: [Constellation]
     private let cumulativeStarCounts: [Int]
 
+    /// The point the sky is centred and ordered on — the user's zenith at first
+    /// launch. Everything unlocks outward from here, so it's also where the
+    /// chart is drawn from.
+    var anchor: EquatorialCoordinate {
+        constellations.first?.center
+            ?? EquatorialCoordinate(rightAscensionDegrees: 0, declinationDegrees: 0)
+    }
+
     init(constellations: [Constellation]) {
         self.constellations = constellations
         var running = 0

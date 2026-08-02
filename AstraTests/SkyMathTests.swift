@@ -176,6 +176,61 @@ struct SkyMathTests {
         #expect(abs(SkyMath.angularSeparation(a, b) - 45) < 1e-6)
     }
 
+    // MARK: - Projection
+
+    @Test func centreProjectsToTheOrigin() {
+        let centre = EquatorialCoordinate(rightAscensionHours: 5.6, declinationDegrees: -1.2)
+        let point = SkyMath.project(centre, from: centre)
+        #expect(point.x == 0)
+        #expect(point.y == 0)
+        #expect(point.angularDistance == 0)
+    }
+
+    /// The property the whole chart rests on: radius from the centre equals
+    /// angular separation, so the unlock order — which is sorted by angular
+    /// separation — reads as rings spreading outward.
+    @Test func radiusEqualsAngularSeparation() {
+        let centre = EquatorialCoordinate(rightAscensionDegrees: 180, declinationDegrees: 30)
+        let samples = [
+            EquatorialCoordinate(rightAscensionDegrees: 200, declinationDegrees: 45),
+            EquatorialCoordinate(rightAscensionDegrees: 10, declinationDegrees: -60),
+            EquatorialCoordinate(rightAscensionDegrees: 181, declinationDegrees: 31),
+            EquatorialCoordinate(rightAscensionDegrees: 0, declinationDegrees: 90),
+        ]
+        for sample in samples {
+            let point = SkyMath.project(sample, from: centre)
+            let separation = SkyMath.angularSeparation(centre, sample)
+            #expect(abs(point.angularDistance - separation) < 1e-6)
+            #expect(abs(hypot(point.x, point.y) - separation) < 1e-6)
+        }
+    }
+
+    @Test func antipodeLandsOnTheRim() {
+        let centre = EquatorialCoordinate(rightAscensionDegrees: 90, declinationDegrees: 20)
+        let opposite = EquatorialCoordinate(rightAscensionDegrees: 270, declinationDegrees: -20)
+        #expect(abs(SkyMath.project(opposite, from: centre).angularDistance - 180) < 1e-6)
+    }
+
+    /// North of the centre must render above it, and east to the left, or the
+    /// chart is mirrored against every star atlas the user might compare it to.
+    @Test func orientationPutsNorthUpAndEastLeft() {
+        let centre = EquatorialCoordinate(rightAscensionDegrees: 100, declinationDegrees: 0)
+
+        let north = SkyMath.project(
+            EquatorialCoordinate(rightAscensionDegrees: 100, declinationDegrees: 10),
+            from: centre
+        )
+        #expect(north.y > 0)
+        #expect(abs(north.x) < 1e-6)
+
+        let east = SkyMath.project(
+            EquatorialCoordinate(rightAscensionDegrees: 110, declinationDegrees: 0),
+            from: centre
+        )
+        #expect(east.x > 0)
+        #expect(abs(east.y) < 1e-6)
+    }
+
     /// The zenith is what "nearest constellation" is measured from, so it has to
     /// be the point that reads as directly overhead.
     @Test func zenithIsOverhead() {

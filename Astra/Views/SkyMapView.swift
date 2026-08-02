@@ -1,42 +1,60 @@
 import SwiftUI
 import SwiftData
 
-/// The sky tab: what the user has lit, what they're lighting now, and what
-/// comes after.
+/// The sky tab: the user's whole universe, and the proof of what filled it.
 ///
-/// Every star is drawn from its catalogued position, magnitude, and colour —
-/// there is no illustration anywhere in this file. The figure you see is the
-/// figure that's actually above you.
+/// The chart is the screen. Everything else — the counts, the current figure —
+/// sits over it as light chrome, because the thing worth looking at is the
+/// spread of lit stars against the dark.
 struct SkyMapView: View {
     @Query(sort: [SortDescriptor(\Award.ordinal)]) private var awards: [Award]
 
     let progression: SkyProgression
 
+    /// Presented with `sheet(item:)` rather than `sheet(isPresented:)`: the
+    /// latter builds its content from whatever the state was when the flag
+    /// flipped, which races the star being set in the same update and shows an
+    /// empty sheet.
     @State private var selectedStar: Star?
 
-    private var lit: [(constellation: Constellation, litCount: Int)] {
-        progression.litStars(awardCount: awards.count)
-    }
+    private let catalog = StarCatalog.shared
 
     private var active: (constellation: Constellation, litCount: Int)? {
         progression.active(awardCount: awards.count)
     }
 
+    private var completedCount: Int {
+        progression.completed(awardCount: awards.count).count
+    }
+
+    /// How far out the user has reached, in degrees from where they started.
+    private var reach: Double {
+        progression.litStars(awardCount: awards.count)
+            .map { SkyMath.angularSeparation(progression.anchor, $0.constellation.center) }
+            .max() ?? 0
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    if let active {
-                        activeSection(active)
-                    } else if awards.isEmpty {
-                        emptyState
-                    }
-                    completedSection
+            ZStack(alignment: .top) {
+                SkyChartView(
+                    progression: progression,
+                    catalog: catalog,
+                    litCount: awards.count
+                ) { star in
+                    selectedStar = star
                 }
-                .padding(20)
+                .ignoresSafeArea(edges: .bottom)
+
+                if awards.isEmpty {
+                    emptyState
+                } else {
+                    stats
+                }
             }
             .background(Theme.background)
             .navigationTitle("Sky")
+            .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $selectedStar) { star in
                 StarDetailSheet(
                     star: star,
@@ -48,46 +66,56 @@ struct SkyMapView: View {
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Chrome
 
-    private func activeSection(_ current: (constellation: Constellation, litCount: Int)) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(current.constellation.name)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(Theme.starlight)
-                Spacer()
-                Text("\(current.litCount) of \(current.constellation.starCount)")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.subdued)
-                    .contentTransition(.numericText())
+    /// The numbers that make the work legible. Stars lit is the headline
+    /// because it's exactly the number of days shown up — one star, one day.
+    private var stats: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 0) {
+                statTile(value: "\(awards.count)", label: awards.count == 1 ? "star lit" : "stars lit")
+                divider
+                statTile(value: "\(completedCount)", label: completedCount == 1 ? "figure done" : "figures done")
+                divider
+                statTile(value: "\(Int(reach.rounded()))°", label: "reached")
             }
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
 
-            ConstellationCanvas(
-                constellation: current.constellation,
-                litCount: current.litCount,
-                onTapStar: { selectedStar = $0 }
-            )
-            .frame(height: 320)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Theme.surface.opacity(0.5))
-            )
-
-            Text(remainingLine(current))
-                .font(.callout)
-                .foregroundStyle(Theme.subdued)
+            if let active {
+                Text("\(active.constellation.name) · \(active.litCount) of \(active.constellation.starCount)")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.subdued)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
         }
+        .padding(.horizontal, 16)
+        .allowsHitTesting(false)
     }
 
-    private func remainingLine(_ current: (constellation: Constellation, litCount: Int)) -> String {
-        let left = current.constellation.starCount - current.litCount
-        if left == 1 { return "One more day completes it." }
-        return "\(left) more days complete it."
+    private func statTile(value: String, label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.title3.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Theme.starlight)
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(Theme.subdued)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Theme.unlit.opacity(0.4))
+            .frame(width: 0.5, height: 28)
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 8) {
             Text("Your sky is dark.")
                 .font(.title3.weight(.medium))
                 .foregroundStyle(Theme.starlight)
@@ -95,176 +123,28 @@ struct SkyMapView: View {
                 .font(.callout)
                 .foregroundStyle(Theme.subdued)
         }
-        .padding(.vertical, 40)
-    }
-
-    @ViewBuilder
-    private var completedSection: some View {
-        let done = lit.filter { $0.litCount == $0.constellation.starCount }
-        if !done.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Completed")
-                    .font(.headline)
-                    .foregroundStyle(Theme.subdued)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                    ForEach(done, id: \.constellation.id) { entry in
-                        CompletedCard(constellation: entry.constellation) {
-                            selectedStar = $0
-                        }
-                    }
-                }
-            }
-        }
+        .padding(20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 16)
+        .allowsHitTesting(false)
     }
 
     // MARK: - Lookups
 
     private func isLit(_ star: Star) -> Bool {
-        for entry in lit {
-            if entry.constellation.abbreviation == star.constellation {
-                return entry.constellation.stars.prefix(entry.litCount).contains { $0.hr == star.hr }
-            }
+        for entry in progression.litStars(awardCount: awards.count)
+        where entry.constellation.abbreviation == star.constellation {
+            return entry.constellation.stars.prefix(entry.litCount).contains { $0.hr == star.hr }
         }
         return false
     }
 
-    /// The day a star was earned, via the award whose ordinal maps to it.
     private func litDay(_ star: Star) -> DayKey? {
-        for award in awards {
-            if progression.star(forOrdinal: award.ordinal)?.star.hr == star.hr {
-                return award.day
-            }
+        for award in awards
+        where progression.star(forOrdinal: award.ordinal)?.star.hr == star.hr {
+            return award.day
         }
         return nil
-    }
-}
-
-// MARK: - Canvas
-
-/// A constellation's stars, projected and drawn. Lit stars glow in their
-/// measured colour; unlit ones wait as faint rings.
-struct ConstellationCanvas: View {
-    let constellation: Constellation
-    let litCount: Int
-    var onTapStar: ((Star) -> Void)?
-
-    var body: some View {
-        GeometryReader { geometry in
-            let placed = Self.layout(constellation.stars, in: geometry.size)
-            let litHRs = Set(constellation.stars.prefix(litCount).map(\.hr))
-
-            Canvas { canvasContext, _ in
-                for (star, point) in placed {
-                    let radius = Theme.starRadius(magnitude: star.magnitude)
-                    let color = Theme.starColor(bv: star.colorIndex)
-                    let rect = CGRect(
-                        x: point.x - radius, y: point.y - radius,
-                        width: radius * 2, height: radius * 2
-                    )
-                    if litHRs.contains(star.hr) {
-                        // Glow: a blurred disc under a solid core.
-                        let glow = rect.insetBy(dx: -radius * 1.5, dy: -radius * 1.5)
-                        canvasContext.drawLayer { layer in
-                            layer.addFilter(.blur(radius: radius * 1.2))
-                            layer.fill(Path(ellipseIn: glow), with: .color(color.opacity(0.5)))
-                        }
-                        canvasContext.fill(Path(ellipseIn: rect), with: .color(color))
-                    } else {
-                        canvasContext.stroke(
-                            Path(ellipseIn: rect),
-                            with: .color(Theme.unlit),
-                            lineWidth: 1
-                        )
-                    }
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { location in
-                // Generous hit target: nearest star within 30 points.
-                let nearest = placed.min {
-                    hypot($0.1.x - location.x, $0.1.y - location.y)
-                        < hypot($1.1.x - location.x, $1.1.y - location.y)
-                }
-                if let nearest,
-                   hypot(nearest.1.x - location.x, nearest.1.y - location.y) < 30 {
-                    onTapStar?(nearest.0)
-                }
-            }
-        }
-    }
-
-    /// Projects stars into view space.
-    ///
-    /// A plate carrée around the figure's centre, with right ascension scaled
-    /// by cos(declination) so shapes keep their proportions away from the
-    /// equator — full gnomonic projection buys nothing at constellation scale.
-    /// East is left, as it is when you look up.
-    static func layout(_ stars: [Star], in size: CGSize) -> [(Star, CGPoint)] {
-        guard !stars.isEmpty else { return [] }
-
-        let centerRA = averageRA(stars)
-        let midDec = stars.map(\.coordinate.declination).reduce(0, +) / Double(stars.count)
-        let cosDec = max(0.2, cos(midDec * .pi / 180))
-
-        let points = stars.map { star -> (Star, CGPoint) in
-            var dRA = star.coordinate.rightAscension - centerRA
-            if dRA > 180 { dRA -= 360 }
-            if dRA < -180 { dRA += 360 }
-            return (star, CGPoint(x: -dRA * cosDec, y: -star.coordinate.declination))
-        }
-
-        let xs = points.map(\.1.x), ys = points.map(\.1.y)
-        guard let minX = xs.min(), let maxX = xs.max(),
-              let minY = ys.min(), let maxY = ys.max() else { return [] }
-
-        let inset = 32.0
-        let spanX = max(maxX - minX, 0.001)
-        let spanY = max(maxY - minY, 0.001)
-        let scale = min(
-            (size.width - inset * 2) / spanX,
-            (size.height - inset * 2) / spanY
-        )
-
-        return points.map { star, raw in
-            (star, CGPoint(
-                x: (raw.x - (minX + maxX) / 2) * scale + size.width / 2,
-                y: (raw.y - (minY + maxY) / 2) * scale + size.height / 2
-            ))
-        }
-    }
-
-    private static func averageRA(_ stars: [Star]) -> Double {
-        var x = 0.0, y = 0.0
-        for star in stars {
-            let ra = star.coordinate.rightAscension * .pi / 180
-            x += cos(ra); y += sin(ra)
-        }
-        return SkyMath.normalizedDegrees(atan2(y, x) * 180 / .pi)
-    }
-}
-
-/// A finished figure, small and fully aglow.
-private struct CompletedCard: View {
-    let constellation: Constellation
-    var onTapStar: ((Star) -> Void)?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ConstellationCanvas(
-                constellation: constellation,
-                litCount: constellation.starCount,
-                onTapStar: onTapStar
-            )
-            .frame(height: 110)
-            Text(constellation.name)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(Theme.starlight)
-            Text("\(constellation.starCount) stars")
-                .font(.caption2)
-                .foregroundStyle(Theme.subdued)
-        }
-        .padding(12)
-        .background(Theme.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -302,6 +182,7 @@ struct StarDetailSheet: View {
                     Text(line)
                         .font(.callout)
                         .foregroundStyle(Theme.starlight.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -321,7 +202,7 @@ struct StarDetailSheet: View {
         .background(Theme.background)
     }
 
-    /// True sentences from catalogue fields. No adjectives the data doesn't
+    /// True sentences from catalogue fields. No adjective the data doesn't
     /// support.
     private var factLines: [String] {
         var lines: [String] = []
@@ -332,34 +213,31 @@ struct StarDetailSheet: View {
 
         if let distance = star.distanceLightYears {
             let years = Int(distance.rounded())
-            lines.append("Its light left \(years) years ago — that's the star as it was in \(Calendar.current.component(.year, from: .now) - years).")
+            let departed = Calendar.current.component(.year, from: .now) - years
+            lines.append("Its light left \(years) years ago — the star as it was in \(departed).")
         }
 
         if let kelvin = star.temperatureKelvin {
             let sun = 5_772.0
+            let rounded = Int((kelvin / 100).rounded() * 100)
             if kelvin > sun * 1.3 {
-                lines.append("Surface around \(Int(kelvin.rounded(toNearest: 100))) K — far hotter than the Sun, which is why it burns blue-white.")
+                lines.append("Around \(rounded) K at the surface — far hotter than the Sun, which is why it burns blue-white.")
             } else if kelvin < sun * 0.75 {
-                lines.append("Surface around \(Int(kelvin.rounded(toNearest: 100))) K — cooler than the Sun, glowing orange-red.")
+                lines.append("Around \(rounded) K at the surface — cooler than the Sun, glowing orange-red.")
             } else {
-                lines.append("Surface around \(Int(kelvin.rounded(toNearest: 100))) K — close to our own Sun's temperature.")
+                lines.append("Around \(rounded) K at the surface — close to our own Sun's temperature.")
             }
         }
 
+        let magnitude = star.magnitude.formatted(.number.precision(.fractionLength(1)))
         if star.magnitude < 1.5 {
-            lines.append("At magnitude \(star.magnitude.formatted(.number.precision(.fractionLength(1)))), it's among the brightest stars in the entire sky.")
+            lines.append("At magnitude \(magnitude), among the brightest stars in the whole sky.")
         } else if star.magnitude < 4 {
-            lines.append("Magnitude \(star.magnitude.formatted(.number.precision(.fractionLength(1)))) — visible to the naked eye even from a town.")
+            lines.append("Magnitude \(magnitude) — visible to the naked eye even from a town.")
         } else {
-            lines.append("Magnitude \(star.magnitude.formatted(.number.precision(.fractionLength(1)))) — you'll want a dark sky to pick it out unaided.")
+            lines.append("Magnitude \(magnitude) — you'll want a dark sky to pick it out unaided.")
         }
 
         return lines
-    }
-}
-
-private extension Double {
-    func rounded(toNearest step: Double) -> Double {
-        (self / step).rounded() * step
     }
 }

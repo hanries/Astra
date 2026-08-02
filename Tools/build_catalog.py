@@ -85,6 +85,129 @@ PROPER_NAMES = {
     "Gam Cas": "Navi",         "Alp Lup": "Kakkab",       "Bet Eri": "Cursa",
 }
 
+# Constellation figures, as edges between Bayer designations.
+#
+# Written as designations rather than HR numbers on purpose: "Orion's belt joins
+# Zeta, Epsilon and Delta Ori" is a checkable claim, while a list of catalogue
+# numbers is a list of things to mistype. The build resolves them against the
+# catalogue and reports anything that doesn't land.
+#
+# Figures are a drawing convention rather than catalogue data — these are the
+# common Western forms written out here, not copied from Stellarium, whose set
+# is GPL. An edge may name a star in another constellation: Pegasus' Great
+# Square borrows Alpha Andromedae, as the sky actually has it.
+FIGURES = {
+    "UMa": [("Eta","Zet"),("Zet","Eps"),("Eps","Del"),("Del","Gam"),
+            ("Gam","Bet"),("Bet","Alp"),("Alp","Del")],
+    "UMi": [("Alp","Del"),("Del","Eps"),("Eps","Zet"),("Zet","Bet"),
+            ("Bet","Gam"),("Gam","Eta"),("Eta","Zet")],
+    "Ori": [("Alp","Gam"),("Alp","Zet"),("Gam","Del"),("Zet","Eps"),
+            ("Eps","Del"),("Zet","Kap"),("Del","Bet")],
+    "Cas": [("Bet","Alp"),("Alp","Gam"),("Gam","Del"),("Del","Eps")],
+    "Cyg": [("Alp","Gam"),("Gam","Eta"),("Eta","Bet"),("Gam","Del"),("Gam","Eps")],
+    "Lyr": [("Alp","Zet"),("Zet","Del"),("Del","Gam"),("Gam","Bet"),("Bet","Zet")],
+    "Cru": [("Alp","Gam"),("Bet","Del")],
+    "Leo": [("Eps","Mu "),("Mu ","Zet"),("Zet","Gam"),("Gam","Eta"),("Eta","Alp"),
+            ("Alp","The"),("The","Bet"),("The","Del"),("Del","Gam")],
+    "Boo": [("Alp","Eps"),("Eps","Del"),("Del","Bet"),("Bet","Gam"),("Gam","Alp")],
+    "Gem": [("Alp","Tau"),("Tau","Eps"),("Eps","Nu "),("Bet","Del"),
+            ("Del","Zet"),("Zet","Gam"),("Tau","Del")],
+    "Tau": [("Alp","The"),("The","Gam"),("Gam","Del"),("Del","Eps"),
+            ("Eps","Alp"),("Alp","Bet"),("Gam","Lam")],
+    "CMa": [("Alp","Bet"),("Alp","Del"),("Del","Eta"),("Del","Eps"),
+            ("Eps","Sig"),("Sig","Alp")],
+    "Aql": [("Alp","Bet"),("Alp","Gam"),("Gam","Del"),("Del","Eta"),("Del","The")],
+    "Sco": [("Bet","Del"),("Del","Sig"),("Sig","Alp"),("Alp","Tau"),("Tau","Eps"),
+            ("Eps","Mu "),("Mu ","Zet"),("Zet","Eta"),("Eta","The"),("The","Iot"),
+            ("Iot","Kap"),("Kap","Lam"),("Lam","Ups")],
+    "Peg": [("Alp","Bet"),("Bet","Gam"),("Gam","Alp And"),("Alp And","Alp"),
+            ("Bet","Eta"),("Alp","The"),("The","Eps")],
+    "And": [("Alp","Del"),("Del","Bet"),("Bet","Gam")],
+    "Per": [("Alp","Gam"),("Gam","Eta"),("Alp","Del"),("Del","Eps"),
+            ("Eps","Zet"),("Alp","Bet"),("Bet","Rho")],
+    "Aur": [("Alp","Bet"),("Bet","The"),("The","Iot"),("Iot","Eps"),("Eps","Alp")],
+    "Vir": [("Alp","Gam"),("Gam","Eta"),("Eta","Bet"),("Gam","Del"),
+            ("Del","Eps"),("Alp","Zet"),("Zet","Del")],
+    "Sgr": [("Zet","Eps"),("Eps","Del"),("Del","Lam"),("Lam","Phi"),("Phi","Sig"),
+            ("Sig","Tau"),("Tau","Zet"),("Del","Gam"),("Sig","Zet")],
+    "Cen": [("Alp","Bet"),("Bet","Eps"),("Eps","Zet"),("Zet","Gam"),("Gam","Eps")],
+    "Car": [("Alp","Bet"),("Bet","Ome"),("Ome","The"),("The","Iot"),("Iot","Eps")],
+    "Cap": [("Alp","Bet"),("Bet","The"),("The","Del"),("Del","Gam"),("Gam","Iot")],
+    "Cnc": [("Alp","Del"),("Del","Gam"),("Del","Bet"),("Gam","Iot")],
+    "CrB": [("Alp","Bet"),("Bet","The"),("Alp","Gam"),("Gam","Del"),("Del","Eps")],
+    "Del": [("Alp","Bet"),("Bet","Gam"),("Gam","Del"),("Del","Bet"),("Bet","Eps")],
+    "Lep": [("Alp","Bet"),("Bet","Gam"),("Gam","Del"),("Alp","Mu "),("Mu ","Eps")],
+    "Cet": [("Alp","Gam"),("Gam","Del"),("Del","Omi"),("Omi","Zet"),
+            ("Zet","Bet"),("Bet","Iot"),("Iot","Eta"),("Eta","Zet")],
+    "Ari": [("Alp","Bet"),("Bet","Gam")],
+    "Cep": [("Alp","Bet"),("Bet","Gam"),("Gam","Iot"),("Iot","Alp"),("Alp","Eta")],
+    "Dra": [("Gam","Bet"),("Bet","Nu "),("Nu ","Xi "),("Xi ","Gam"),
+            ("Xi ","Del"),("Del","Eps"),("Alp","Kap"),("Kap","Lam")],
+    "Her": [("Alp","Bet"),("Bet","Zet"),("Zet","Eta"),("Eta","Pi "),
+            ("Pi ","Eps"),("Eps","Zet"),("Bet","Gam")],
+    "Oph": [("Alp","Bet"),("Bet","Kap"),("Alp","Kap"),("Kap","Eta"),("Eta","Zet")],
+    "Pav": [("Alp","Bet"),("Bet","Del"),("Del","Lam")],
+    "Gru": [("Alp","Bet"),("Bet","Del"),("Del","Gam")],
+    "Phe": [("Alp","Bet"),("Bet","Gam"),("Gam","Del"),("Alp","Eps")],
+    "Vel": [("Gam","Del"),("Del","Kap"),("Kap","Mu "),("Mu ","Lam"),("Lam","Gam")],
+    "Pup": [("Zet","Pi "),("Pi ","Nu "),("Nu ","Tau"),("Zet","Rho")],
+    "Hya": [("Alp","Eps"),("Eps","Del"),("Del","Eta"),("Eta","Zet"),
+            ("Zet","Iot"),("Alp","Ups")],
+    "PsA": [("Alp","Bet"),("Bet","Gam"),("Gam","Del"),("Del","Alp")],
+    "Lup": [("Alp","Bet"),("Bet","Del"),("Del","Gam"),("Gam","Eta")],
+    "TrA": [("Alp","Bet"),("Bet","Gam"),("Gam","Alp")],
+    "Tuc": [("Alp","Gam"),("Gam","Bet")],
+    "Mus": [("Alp","Bet"),("Alp","Del"),("Del","Gam")],
+    "Lib": [("Alp","Bet"),("Bet","Gam"),("Gam","Alp")],
+    "Aqr": [("Alp","Bet"),("Alp","Gam"),("Gam","Zet"),("Zet","Eta"),("Alp","The")],
+    "Col": [("Alp","Bet"),("Bet","Gam"),("Bet","Eta")],
+    "CMi": [("Alp","Bet")],
+    "Sge": [("Alp","Del"),("Del","Gam"),("Bet","Del")],
+    "Equ": [("Alp","Del"),("Del","Gam")],
+    "Tri": [("Alp","Bet"),("Bet","Gam"),("Gam","Alp")],
+    "Ser": [("Alp","Del"),("Del","Bet"),("Bet","Kap"),("Kap","Gam"),("Gam","Bet")],
+    "CrA": [("Alp","Bet"),("Bet","Gam"),("Gam","Del")],
+    "Ind": [("Alp","Bet"),("Bet","Del")],
+    "Hyi": [("Alp","Bet"),("Bet","Gam")],
+    "Dor": [("Alp","Bet"),("Bet","Del")],
+    "Ret": [("Alp","Bet"),("Bet","Del"),("Del","Eps"),("Eps","Alp")],
+    "Mon": [("Alp","Gam"),("Alp","Bet"),("Bet","Del"),("Del","Eps")],
+    "Crv": [("Alp","Eps"),("Eps","Gam"),("Gam","Del"),("Del","Bet"),("Bet","Eps")],
+    "Crt": [("Alp","Bet"),("Bet","Gam"),("Gam","Del"),("Del","Alp"),("Gam","Zet")],
+    "Ara": [("Alp","Bet"),("Bet","Gam"),("Gam","Del"),("Alp","The")],
+    "Cir": [("Alp","Bet"),("Alp","Gam")],
+    "Aps": [("Alp","Gam"),("Gam","Bet")],
+    "Cha": [("Alp","Gam"),("Gam","Bet")],
+    "Vol": [("Alp","Bet"),("Bet","Eps"),("Eps","Gam")],
+    "Men": [("Alp","Bet")],
+    "CVn": [("Alp","Bet")],
+    "Com": [("Alp","Bet"),("Bet","Gam")],
+    "Sex": [("Alp","Gam")],
+    "Psc": [("Alp","Omi"),("Omi","Eta"),("Alp","Nu "),("Nu ","Mu "),
+            ("Mu ","Eps"),("Eps","Del"),("Del","Ome"),("Ome","Iot"),
+            ("Iot","The"),("The","Gam"),("Gam","Kap"),("Kap","Lam"),
+            ("Lam","Iot")],
+    "Eri": [("Alp","Chi"),("Chi","Phi"),("Phi","Kap"),("Kap","Iot"),
+            ("Iot","The"),("The","Ups"),("Ups","Tau"),("Tau","Eta"),
+            ("Eta","Eps"),("Eps","Del"),("Del","Gam"),("Gam","Bet")],
+    "Scl": [("Alp","Del"),("Del","Gam"),("Gam","Bet")],
+    "Pic": [("Alp","Bet"),("Bet","Gam")],
+    "Pyx": [("Alp","Bet"),("Alp","Gam")],
+    "Sct": [("Alp","Bet"),("Alp","Gam")],
+    "Nor": [("Gam","Eps"),("Eps","Del")],
+    "Ant": [("Alp","Eps"),("Alp","Iot")],
+    "Hor": [("Alp","Bet")],
+    "For": [("Alp","Bet")],
+    "Cae": [("Alp","Bet")],
+    "Tel": [("Alp","Eps")],
+    "Mic": [("Gam","Eps")],
+    "Lac": [("Alp","Bet")],
+    "Oct": [("Nu ","Bet"),("Bet","Del")],
+    # No figures for Leo Minor, Lynx or Vulpecula: Bayer never assigned them the
+    # letters a line would need — Leo Minor has no Alpha, Lynx and Vulpecula no
+    # Beta. They stay as loose stars, which is how they look in the sky anyway.
+}
+
 SUPERSCRIPT_DIGITS = {"1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵"}
 
 GREEK = {
@@ -142,6 +265,8 @@ def parse_star(line):
     }
 
     if bayer:
+        # Kept only for figure resolution; stripped before the JSON is written.
+        star["_designation"] = designation
         greek = GREEK.get(bayer, bayer)
         # Bayer superscripts mark the components of a naked-eye pair — Acrux is
         # Alpha¹ and Alpha² Crucis — and belong on the letter, not trailing the
@@ -166,6 +291,40 @@ def parse_star(line):
     return star
 
 
+def resolve_figures(stars):
+    """Turn Bayer-designation edges into HR-number pairs.
+
+    An edge names either a bare Bayer letter (resolved inside its own
+    constellation) or a full "Alp And" designation for the figures that reach
+    across a boundary. Unresolvable edges are dropped and reported rather than
+    silently omitted — a missing line is a missing line, and it should be
+    visible in the build output.
+    """
+    by_designation = {}
+    for star in stars:
+        bayer = star.get("_designation")
+        if bayer and bayer not in by_designation:
+            by_designation[bayer] = star["hr"]
+
+    figures, dropped = {}, []
+    for constellation, edges in FIGURES.items():
+        resolved = []
+        for left, right in edges:
+            keys = [
+                key if " " in key.strip() and len(key.strip()) > 3
+                else f"{key.strip()} {constellation}"
+                for key in (left, right)
+            ]
+            hrs = [by_designation.get(key) for key in keys]
+            if None in hrs:
+                dropped.append(f"{constellation}: {keys[0]} - {keys[1]}")
+                continue
+            resolved.append(hrs)
+        if resolved:
+            figures[constellation] = resolved
+    return figures, dropped
+
+
 def main():
     if len(sys.argv) != 3:
         sys.exit(f"usage: {sys.argv[0]} <bsc5.dat> <out.json>")
@@ -175,10 +334,14 @@ def main():
         stars = [s for s in (parse_star(line) for line in handle) if s]
 
     stars.sort(key=lambda s: s["magnitude"])
+    figures, dropped = resolve_figures(stars)
+    for star in stars:
+        star.pop("_designation", None)
 
     payload = {
         "source": "Yale Bright Star Catalogue, 5th Revised Ed. (Hoffleit & Warren, 1991)",
         "stars": stars,
+        "figures": figures,
     }
     with open(destination, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, separators=(",", ":"), ensure_ascii=False)
@@ -186,9 +349,15 @@ def main():
     named = sum(1 for s in stars if "name" in s)
     with_distance = sum(1 for s in stars if "ly" in s)
     constellations = len({s["constellation"] for s in stars})
+    edges = sum(len(e) for e in figures.values())
     print(f"{len(stars)} stars across {constellations} constellations")
     print(f"  {named} with proper names")
     print(f"  {with_distance} with a distance we trust")
+    print(f"{edges} figure edges across {len(figures)} constellations")
+    if dropped:
+        print(f"  {len(dropped)} edges dropped — no such star:")
+        for entry in dropped:
+            print(f"    {entry}")
 
 
 if __name__ == "__main__":
