@@ -210,15 +210,6 @@ struct SkyChartView: View {
             )),
             with: .color(Color(red: 1, green: 0.95, blue: 0.80))
         )
-
-        let label = Text("the Sun")
-            .font(.caption2)
-            .foregroundStyle(Theme.subdued)
-        context.draw(
-            context.resolve(label),
-            at: CGPoint(x: centre.x, y: centre.y + 20),
-            anchor: .center
-        )
     }
 
     /// Figure lines, drawn only where both ends are lit. A half-finished
@@ -239,18 +230,76 @@ struct SkyChartView: View {
         }
     }
 
-    /// Constellation names, but only when zoomed in far enough that they'd fit
-    /// and only for figures the user has started. Labels at full-sky zoom are
-    /// just noise.
+    /// Names the figures the user has started, beneath each one.
+    ///
+    /// Without these the map is a field of anonymous dots — you can see you've
+    /// done work, but not what the work *is*. Every started figure is offered a
+    /// caption; any that would overlap one already placed is skipped rather
+    /// than drawn on top, so a zoomed-out sky labels what it has room for and a
+    /// zoomed-in one labels everything.
+    ///
+    /// Completed figures get a brighter caption than ones in progress, so the
+    /// finished sky reads at a glance.
     private func drawLabels(in context: inout GraphicsContext, layout: ChartLayout, state: LitState) {
-        guard layout.pointsPerDegree > 6 else { return }
+        var placed: [CGRect] = []
+
+        // The Sun's caption goes down first and claims its space, so a
+        // constellation label can't be drawn across the one fixed reference
+        // point on the chart.
+        let sunAnchor = CGPoint(x: layout.centrePoint.x, y: layout.centrePoint.y + 19)
+        let sunCaption = Text("the Sun")
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Theme.starlight.opacity(0.7))
+        _ = place(sunCaption, at: sunAnchor, in: &context, layout: layout, placed: &placed)
+
         for entry in progression.litStars(awardCount: litCount) {
-            guard let point = layout.point(for: entry.constellation.center) else { continue }
-            let text = Text(entry.constellation.name)
-                .font(.caption2)
-                .foregroundStyle(Theme.subdued.opacity(0.8))
-            context.draw(context.resolve(text), at: point, anchor: .center)
+            let lit = entry.constellation.stars.prefix(entry.litCount)
+            // Hang the caption below the figure's lowest lit star rather than
+            // its centre, so it sits under the shape instead of inside it.
+            let points = lit.compactMap { layout.point(for: $0.coordinate) }
+            guard let lowest = points.max(by: { $0.y < $1.y }) else { continue }
+            let midX = points.map(\.x).reduce(0, +) / Double(points.count)
+            let anchor = CGPoint(x: midX, y: lowest.y + 16)
+
+            let isComplete = entry.litCount == entry.constellation.starCount
+            let caption = Text(entry.constellation.name)
+                .font(.system(size: 10, weight: isComplete ? .medium : .regular))
+                .foregroundStyle(
+                    isComplete
+                        ? Theme.starlight.opacity(0.75)
+                        : Theme.subdued.opacity(0.65)
+                )
+            _ = place(caption, at: anchor, in: &context, layout: layout, placed: &placed)
         }
+    }
+
+    /// Draws a caption if it fits entirely on screen and clears everything
+    /// already placed. Returns the rect it took, or nil if it was skipped.
+    ///
+    /// Fully on screen, not merely overlapping: a half-drawn "…dus" hanging off
+    /// the edge reads as a rendering fault rather than as a label.
+    private func place(
+        _ caption: Text,
+        at anchor: CGPoint,
+        in context: inout GraphicsContext,
+        layout: ChartLayout,
+        placed: inout [CGRect]
+    ) -> CGRect? {
+        let resolved = context.resolve(caption)
+        let measured = resolved.measure(in: layout.size)
+        let frame = CGRect(
+            x: anchor.x - measured.width / 2 - 4,
+            y: anchor.y - measured.height / 2 - 2,
+            width: measured.width + 8,
+            height: measured.height + 4
+        )
+        guard frame.minX >= 0, frame.maxX <= layout.size.width,
+              frame.minY >= 0, frame.maxY <= layout.size.height else { return nil }
+        guard !placed.contains(where: { $0.intersects(frame) }) else { return nil }
+
+        placed.append(frame)
+        context.draw(resolved, at: anchor, anchor: .center)
+        return frame
     }
 
     // MARK: - Interaction

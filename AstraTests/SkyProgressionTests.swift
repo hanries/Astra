@@ -16,7 +16,7 @@ struct SkyProgressionTests {
         let position = ObserverPosition(latitude: 40.71, longitude: -74.01)
         let when = Date(timeIntervalSince1970: 946_728_000)
         return SkyProgression(
-            constellations: catalog.constellationsBySize(from: position, at: when)
+            constellations: catalog.constellationsInUnlockOrder(from: position, at: when)
         )
     }
 

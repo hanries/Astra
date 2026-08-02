@@ -77,16 +77,24 @@ struct StarCatalog: Sendable {
         constellationsByAbbreviation[abbreviation]
     }
 
-    /// The order a user unlocks the sky in: small figures first, growing.
+    /// Size bands the progression moves through, easiest first.
     ///
-    /// Sorted by how many stars a figure has, so the opening constellations
-    /// finish in two or three days and later ones ask for a fortnight. Early
-    /// wins arrive while the habit is still fragile, and the commitment each
-    /// figure asks for grows with the user's ability to meet it.
+    /// Bands rather than exact star counts, because the band is what buys the
+    /// sky its shape. Sorting on exact counts makes tiers of three or four
+    /// figures, so the order hops back to the zenith every couple of unlocks
+    /// and the lit region scatters. A band holds twenty-odd figures, which is
+    /// long enough for a visible sweep outward before the next one begins.
+    static let sizeBands: [ClosedRange<Int>] = [2...4, 5...7, 8...11, 12...Int.max]
+
+    /// The order a user unlocks the sky in.
     ///
-    /// Ties break on angular distance from the zenith, so among equally sized
-    /// figures the nearest overhead comes first — the sky still fills roughly
-    /// outward from where the user was standing, and the order is reproducible.
+    /// Two rules at once. Figures get harder: everything in the 2-to-4-star
+    /// band comes before anything in the 5-to-7 band, so the opening
+    /// constellations close in a couple of days while the habit is still
+    /// fragile and a fortnight-long figure only arrives once someone has shown
+    /// they'll come back. And the sky grows outward: within a band the nearest
+    /// overhead comes first, so each band sweeps from the user's own zenith out
+    /// to the horizon before the next begins.
     ///
     /// Anything that never rises from this latitude is dropped, so a user is
     /// never given a target they can't go outside and look at.
@@ -94,26 +102,27 @@ struct StarCatalog: Sendable {
     /// Compute once and store the result: the zenith moves hourly and the sky
     /// turns through the year, so recomputing later would reshuffle a
     /// progression the user is partway through.
-    func constellationsBySize(
+    func constellationsInUnlockOrder(
         from position: ObserverPosition,
         at date: Date,
         minimumStars: Int = 2
     ) -> [Constellation] {
         let zenith = SkyMath.zenith(for: position, at: date)
 
-        var reachable: [(constellation: Constellation, separation: Double)] = []
+        var reachable: [(constellation: Constellation, band: Int, separation: Double)] = []
         for constellation in constellations {
             guard constellation.starCount >= minimumStars else { continue }
             guard constellation.isEverVisible(fromLatitude: position.latitude) else { continue }
+            let band = Self.sizeBands.firstIndex { $0.contains(constellation.starCount) }
+                ?? Self.sizeBands.count
             let separation = SkyMath.angularSeparation(zenith, constellation.center)
-            reachable.append((constellation, separation))
+            reachable.append((constellation, band, separation))
         }
 
         reachable.sort { left, right in
-            let leftCount = left.constellation.starCount
-            let rightCount = right.constellation.starCount
-            if leftCount != rightCount { return leftCount < rightCount }
+            if left.band != right.band { return left.band < right.band }
             if left.separation != right.separation { return left.separation < right.separation }
+            // Abbreviation last, so the order is fully reproducible.
             return left.constellation.abbreviation < right.constellation.abbreviation
         }
         return reachable.map(\.constellation)
