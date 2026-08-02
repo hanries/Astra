@@ -16,16 +16,20 @@ struct SkyProgression: Sendable {
     let constellations: [Constellation]
     private let cumulativeStarCounts: [Int]
 
-    /// The point the sky is centred and ordered on — the user's zenith at first
-    /// launch. Everything unlocks outward from here, so it's also where the
-    /// chart is drawn from.
-    var anchor: EquatorialCoordinate {
-        constellations.first?.center
-            ?? EquatorialCoordinate(rightAscensionDegrees: 0, declinationDegrees: 0)
-    }
+    /// The sky directly over the user at first launch. The chart is centred
+    /// here and the Sun is drawn here, because this is the point they're
+    /// looking out from.
+    ///
+    /// Stored rather than derived from the first constellation. Deriving it put
+    /// the opening figure exactly at the origin, so the very first star a user
+    /// lit was drawn underneath the Sun marker.
+    let anchor: EquatorialCoordinate
 
-    init(constellations: [Constellation]) {
+    init(constellations: [Constellation], anchor: EquatorialCoordinate? = nil) {
         self.constellations = constellations
+        self.anchor = anchor
+            ?? constellations.first?.center
+            ?? EquatorialCoordinate(rightAscensionDegrees: 0, declinationDegrees: 0)
         var running = 0
         var cumulative: [Int] = []
         for constellation in constellations {
@@ -88,6 +92,7 @@ struct SkyProgression: Sendable {
 /// Loads the frozen order, computing and storing it on first use.
 enum SkyProgressionStore {
     static let orderKey = "sky.progression.order.v1"
+    static let anchorKey = "sky.progression.anchor.v1"
 
     /// The fallback observer when the time zone isn't in the table: the
     /// equator, the one latitude from which every constellation rises.
@@ -105,13 +110,23 @@ enum SkyProgressionStore {
             // a catalogue update that renamed or dropped figures falls through
             // and refreezes rather than silently shrinking the sky.
             if ordered.count == stored.count, !ordered.isEmpty {
-                return SkyProgression(constellations: ordered)
+                let saved = defaults.array(forKey: anchorKey) as? [Double]
+                let anchor = saved.flatMap { pair -> EquatorialCoordinate? in
+                    guard pair.count == 2 else { return nil }
+                    return EquatorialCoordinate(
+                        rightAscensionDegrees: pair[0], declinationDegrees: pair[1]
+                    )
+                }
+                return SkyProgression(constellations: ordered, anchor: anchor)
             }
         }
 
-        let anchor = position ?? ObserverLocation.approximate() ?? fallbackPosition
-        let ordered = catalog.constellationsInUnlockOrder(from: anchor, at: now)
+        let observer = position ?? ObserverLocation.approximate() ?? fallbackPosition
+        let ordered = catalog.constellationsInUnlockOrder(from: observer, at: now)
+        let zenith = SkyMath.zenith(for: observer, at: now)
+
         defaults.set(ordered.map(\.abbreviation), forKey: orderKey)
-        return SkyProgression(constellations: ordered)
+        defaults.set([zenith.rightAscension, zenith.declination], forKey: anchorKey)
+        return SkyProgression(constellations: ordered, anchor: zenith)
     }
 }

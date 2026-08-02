@@ -45,6 +45,50 @@ struct AwardTests {
         #expect(try store.awardCount() == 3)
     }
 
+    /// The strict alternative: a partial day earns nothing, and the star only
+    /// arrives once everything is kept.
+    @Test func allKeptRuleWaitsForTheWholeDay() throws {
+        let store = try makeStore(rule: AllKeptDayRule())
+        let today = store.today()
+        let read = try store.addHabit(name: "Read", colorIndex: 0)
+        let run = try store.addHabit(name: "Run", colorIndex: 1)
+
+        try store.setKept(read, on: today, kept: true)
+        #expect(try store.awardCount() == 0, "a partial day paid out")
+
+        try store.setKept(run, on: today, kept: true)
+        #expect(try store.awardCount() == 1)
+    }
+
+    /// ...and once earned it stays earned, like every other unlock here.
+    @Test func allKeptRuleStillNeverRevokes() throws {
+        let store = try makeStore(rule: AllKeptDayRule())
+        let today = store.today()
+        let read = try store.addHabit(name: "Read", colorIndex: 0)
+        let run = try store.addHabit(name: "Run", colorIndex: 1)
+
+        try store.setKept(read, on: today, kept: true)
+        try store.setKept(run, on: today, kept: true)
+        try store.setKept(run, on: today, kept: false)
+        #expect(try store.awardCount() == 1)
+    }
+
+    /// A habit added today must not retroactively make a finished day
+    /// incomplete — only habits that were live on a day can be required of it.
+    @Test func allKeptRuleIgnoresHabitsThatDidNotExistYet() throws {
+        let store = try makeStore(rule: AllKeptDayRule())
+        let yesterday = store.today().advanced(by: -1)
+
+        let read = try store.addHabit(name: "Read", colorIndex: 0)
+        read.createdOn = yesterday
+        try store.setKept(read, on: yesterday, kept: true)
+        #expect(try store.awardCount() == 1)
+
+        try store.addHabit(name: "Run", colorIndex: 1)
+        try store.reconcileAwards(on: yesterday)
+        #expect(try store.awardCount() == 1, "yesterday was un-completed by a new habit")
+    }
+
     @Test func separateDaysEarnSeparateUnlocks() throws {
         let store = try makeStore()
         let habit = try store.addHabit(name: "Read", colorIndex: 0)

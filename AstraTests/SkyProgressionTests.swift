@@ -111,6 +111,49 @@ struct SkyProgressionTests {
                 == frozen.constellations.map(\.abbreviation))
     }
 
+    /// The chart centres on the observer's zenith, not on the opening figure.
+    /// Deriving it from the first constellation drew that figure's stars
+    /// underneath the Sun marker, so the very first star a user lit was hidden.
+    @Test func anchorIsTheZenithNotTheFirstFigure() throws {
+        let catalog = try loadCatalog()
+        let defaults = try #require(UserDefaults(suiteName: "SkyProgressionTests-\(UUID())"))
+        defer { defaults.removePersistentDomain(forName: defaults.description) }
+
+        let position = ObserverPosition(latitude: 40.71, longitude: -74.01)
+        let when = Date(timeIntervalSince1970: 946_728_000)
+        let sky = SkyProgressionStore.load(
+            catalog: catalog, defaults: defaults, position: position, now: when
+        )
+
+        let zenith = SkyMath.zenith(for: position, at: when)
+        #expect(abs(sky.anchor.rightAscension - zenith.rightAscension) < 0.001)
+        #expect(abs(sky.anchor.declination - zenith.declination) < 0.001)
+
+        // The opening figure sits near the centre without being drawn on it.
+        let opening = try #require(sky.constellations.first)
+        let offset = SkyMath.angularSeparation(sky.anchor, opening.center)
+        #expect(offset > 0.5, "the first figure is drawn on top of the Sun")
+    }
+
+    @Test func storedAnchorSurvivesReload() throws {
+        let catalog = try loadCatalog()
+        let defaults = try #require(UserDefaults(suiteName: "SkyProgressionTests-\(UUID())"))
+        defer { defaults.removePersistentDomain(forName: defaults.description) }
+
+        let first = SkyProgressionStore.load(
+            catalog: catalog, defaults: defaults,
+            position: ObserverPosition(latitude: 35.68, longitude: 139.65),
+            now: Date(timeIntervalSince1970: 946_728_000)
+        )
+        let second = SkyProgressionStore.load(
+            catalog: catalog, defaults: defaults,
+            position: ObserverPosition(latitude: -33.87, longitude: 151.21),
+            now: Date(timeIntervalSince1970: 962_452_800)
+        )
+        #expect(abs(second.anchor.rightAscension - first.anchor.rightAscension) < 0.001)
+        #expect(abs(second.anchor.declination - first.anchor.declination) < 0.001)
+    }
+
     @Test func corruptStoredOrderRefreezesInsteadOfShrinkingTheSky() throws {
         let catalog = try loadCatalog()
         let defaults = try #require(UserDefaults(suiteName: "SkyProgressionTests-\(UUID())"))

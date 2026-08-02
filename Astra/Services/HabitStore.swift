@@ -168,7 +168,10 @@ final class HabitStore {
     /// day, so toggling isn't a way to farm.
     func reconcileAwards(on day: DayKey) throws {
         let keptIDs = try keptHabits(on: day).map(\.id)
-        let deserved = rule.slots(keptHabitIDs: keptIDs)
+        // What the day could have had, so a rule that cares about completeness
+        // can tell "all three kept" from "one of three".
+        let liveCount = try allHabits(includingArchived: true).count { $0.isActive(on: day) }
+        let deserved = rule.slots(keptHabitIDs: keptIDs, activeHabitCount: liveCount)
         guard !deserved.isEmpty else { return }
 
         let raw = day.rawValue

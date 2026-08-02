@@ -47,10 +47,25 @@ enum DebugSeed {
         }
     }
 
+    /// Deletes fetched instances rather than using `delete(model:)`.
+    ///
+    /// The batch form fails here with "mandatory OTO nullify inverse on
+    /// Completion/habit" — it doesn't resolve the cascade from `Habit` to its
+    /// completions, so the store rejects the delete. Removing each completion
+    /// first, saving, then removing the habits works because by then nothing
+    /// points at them.
     static func clear(context: ModelContext) throws {
-        try context.delete(model: Completion.self)
-        try context.delete(model: Award.self)
-        try context.delete(model: Habit.self)
+        for completion in try context.fetch(FetchDescriptor<Completion>()) {
+            context.delete(completion)
+        }
+        try context.save()
+
+        for award in try context.fetch(FetchDescriptor<Award>()) {
+            context.delete(award)
+        }
+        for habit in try context.fetch(FetchDescriptor<Habit>()) {
+            context.delete(habit)
+        }
         try context.save()
     }
 }

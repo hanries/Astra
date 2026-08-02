@@ -46,22 +46,40 @@ final class Award {
 protocol AwardRule {
     /// The slots earned on a day. One `Award` per returned element; the strings
     /// become `Award.slot` and must be stable across runs for the same input.
-    func slots(keptHabitIDs: [UUID]) -> [String]
+    ///
+    /// `activeHabitCount` is what the day *could* have had, which only
+    /// `AllKeptDayRule` needs — but it has to be in the protocol, since a rule
+    /// can't ask for it later.
+    func slots(keptHabitIDs: [UUID], activeHabitCount: Int) -> [String]
 }
 
 /// One unlock for any day you kept at least one habit.
 ///
 /// The default. Keeps a five-habit user and a one-habit user earning at the
-/// same rate, so adding a habit never feels like farming.
+/// same rate, so adding a habit never feels like farming — and a day where you
+/// managed one thing out of three still counts for something, which is the
+/// whole posture of this app.
 struct AnyKeptDayRule: AwardRule {
-    func slots(keptHabitIDs: [UUID]) -> [String] {
+    func slots(keptHabitIDs: [UUID], activeHabitCount: Int) -> [String] {
         keptHabitIDs.isEmpty ? [] : [""]
     }
 }
 
 /// One unlock per habit kept.
 struct PerHabitRule: AwardRule {
-    func slots(keptHabitIDs: [UUID]) -> [String] {
+    func slots(keptHabitIDs: [UUID], activeHabitCount: Int) -> [String] {
         keptHabitIDs.map(\.uuidString).sorted()
+    }
+}
+
+/// One unlock, but only on a day where every habit was kept.
+///
+/// The difference from the default only appears with more than one habit: two
+/// of three kept earns nothing at all. That makes a star mean more, and makes a
+/// partial day a failure — which is the trade, and why it isn't the default.
+struct AllKeptDayRule: AwardRule {
+    func slots(keptHabitIDs: [UUID], activeHabitCount: Int) -> [String] {
+        guard activeHabitCount > 0, keptHabitIDs.count >= activeHabitCount else { return [] }
+        return [""]
     }
 }
