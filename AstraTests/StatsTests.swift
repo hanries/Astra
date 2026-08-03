@@ -91,4 +91,40 @@ struct StatsTests {
         ])
         #expect(union == days([20260701, 20260702, 20260703]))
     }
+
+    @Test func totalKeptCountsEveryDay() {
+        #expect(Stats.totalKept(keptDays: days([20260701, 20260705, 20260709])) == 3)
+        #expect(Stats.totalKept(keptDays: []) == 0)
+    }
+
+    // MARK: - Longest run
+
+    @Test func longestRunCountsConsecutiveDays() {
+        #expect(Stats.longestRun(keptDays: days([20260701, 20260702, 20260703, 20260705, 20260706])) == 3)
+    }
+
+    @Test func longestRunIsZeroForNothing() {
+        #expect(Stats.longestRun(keptDays: []) == 0)
+    }
+
+    @Test func longestRunIsOneForScatteredDays() {
+        #expect(Stats.longestRun(keptDays: days([20260701, 20260705, 20260709])) == 1)
+    }
+
+    @Test func longestRunSpansMonthBoundary() {
+        #expect(Stats.longestRun(keptDays: days([20260629, 20260630, 20260701, 20260702])) == 4)
+    }
+
+    @Test func longestRunSpansYearBoundary() {
+        #expect(Stats.longestRun(keptDays: days([20261230, 20261231, 20270101])) == 3)
+    }
+
+    /// A record of what happened, not a live counter: a gap after the best run
+    /// doesn't reduce it. That's precisely why this one is safe to show where a
+    /// current streak isn't — there's nothing here that tonight can take away.
+    @Test func longestRunSurvivesALaterGap() {
+        let best = days([20260701, 20260702, 20260703, 20260704])
+        let scattered = days([20260710, 20260714])
+        #expect(Stats.longestRun(keptDays: best.union(scattered)) == 4)
+    }
 }

@@ -44,8 +44,34 @@ enum Stats {
         keptDays.max()
     }
 
+    /// Days kept, ever.
+    static func totalKept(keptDays: Set<DayKey>) -> Int { keptDays.count }
+
     /// Days on which at least one habit was kept.
     static func daysWithAnyKeeping(_ perHabit: [Set<DayKey>]) -> Set<DayKey> {
         perHabit.reduce(into: Set<DayKey>()) { $0.formUnion($1) }
+    }
+
+    /// The longest unbroken run of kept days across the whole history.
+    ///
+    /// This is not the streak this file refuses to compute. A live streak is a
+    /// number you are currently holding and could lose tonight, and protecting
+    /// it is what makes people stop opening the app after one bad week. A
+    /// longest run is a record of something already done: it can be beaten, but
+    /// it can't be broken, so there's nothing to defend.
+    static func longestRun(keptDays: Set<DayKey>, calendar: Calendar = .current) -> Int {
+        guard !keptDays.isEmpty else { return 0 }
+        let sorted = keptDays.sorted()
+        var longest = 1
+        var current = 1
+        for (previous, day) in zip(sorted, sorted.dropFirst()) {
+            if previous.advanced(by: 1, in: calendar) == day {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 1
+            }
+        }
+        return longest
     }
 }
