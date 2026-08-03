@@ -15,6 +15,10 @@ struct SkyChartView: View {
     let progression: SkyProgression
     let catalog: StarCatalog
     let litCount: Int
+    /// A star to point at on arrival — the one just earned. Drawn as an
+    /// expanding ring so the eye is taken to it without moving the chart, which
+    /// would cost the user the view they already had.
+    var arrivingStar: Star?
     var onSelectStar: ((Star) -> Void)?
 
     @State private var zoom: CGFloat = 1
@@ -74,6 +78,16 @@ struct SkyChartView: View {
                         magnifyGesture
                     )
                 )
+
+                if let arrivingStar,
+                   let point = layout.point(for: arrivingStar.coordinate) {
+                    ArrivalPulse(colour: Theme.starColor(bv: arrivingStar.colorIndex))
+                        .position(point)
+                        .allowsHitTesting(false)
+                        // Keyed by star, so a second arrival restarts the
+                        // animation rather than inheriting a finished one.
+                        .id(arrivingStar.hr)
+                }
 
                 if isOffCentre {
                     Button {
@@ -360,6 +374,42 @@ struct SkyChartView: View {
             }
         }
         return best?.0
+    }
+}
+
+/// Rings expanding out of a newly lit star.
+///
+/// Runs once and stops. A pulse that keeps going becomes decoration you learn
+/// to ignore; this one exists to say "here" and then get out of the way.
+private struct ArrivalPulse: View {
+    let colour: Color
+
+    @State private var phase: CGFloat = 0
+
+    /// Long enough to be noticed by someone who has just changed screens and
+    /// hasn't found the star yet — a pulse timed to the animation alone is over
+    /// before the eye arrives.
+    static let duration: Double = 2.2
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<3, id: \.self) { index in
+                let delay = Double(index) * 0.34
+                Circle()
+                    .stroke(colour.opacity(0.75 * Double(1 - phase)), lineWidth: 2)
+                    .frame(width: 18 + 104 * phase, height: 18 + 104 * phase)
+                    .animation(
+                        .easeOut(duration: Self.duration).delay(delay),
+                        value: phase
+                    )
+            }
+            Circle()
+                .fill(colour.opacity(0.55 * Double(1 - phase)))
+                .frame(width: 18, height: 18)
+                .blur(radius: 7)
+                .animation(.easeOut(duration: Self.duration), value: phase)
+        }
+        .onAppear { phase = 1 }
     }
 }
 

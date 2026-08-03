@@ -6,12 +6,19 @@ import SwiftData
 @MainActor
 struct AwardTests {
 
-    private func makeStore(rule: AwardRule = AnyKeptDayRule()) throws -> HabitStore {
+    /// Passing no rule uses the app's own default, so these tests exercise what
+    /// actually ships. The helper used to default to `AnyKeptDayRule` itself,
+    /// which quietly meant no test ever checked the shipped rule at all.
+    private func makeStore(rule: AwardRule? = nil) throws -> HabitStore {
         let container = try ModelContainer(
             for: Habit.self, Completion.self, Award.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
-        return HabitStore(context: ModelContext(container), rule: rule)
+        let context = ModelContext(container)
+        if let rule {
+            return HabitStore(context: context, rule: rule)
+        }
+        return HabitStore(context: context)
     }
 
     @Test func keepingADayEarnsAnUnlock() throws {
@@ -23,8 +30,8 @@ struct AwardTests {
         #expect(try store.awardCount() == 1)
     }
 
-    /// Five habits and one habit unlock at the same rate, so adding a habit is
-    /// never a way to farm the collection.
+    /// A complete day pays once however many habits it took, so adding a habit
+    /// is never a way to farm the collection.
     @Test func oneUnlockPerDayRegardlessOfHabitCount() throws {
         let store = try makeStore()
         let today = store.today()
@@ -33,6 +40,45 @@ struct AwardTests {
             try store.setKept(habit, on: today, kept: true)
         }
         #expect(try store.awardCount() == 1)
+    }
+
+    /// The shipped default requires the whole day. Pinned here because it's a
+    /// behavioural choice rather than an implementation detail — a star means
+    /// "I did everything I set out to", and silently loosening that would
+    /// change what every star in the sky stands for.
+    @Test func theDefaultRuleRequiresACompleteDay() throws {
+        let store = try makeStore()
+        let today = store.today()
+        let read = try store.addHabit(name: "Read", colorIndex: 0)
+        let run = try store.addHabit(name: "Run", colorIndex: 1)
+        let stretch = try store.addHabit(name: "Stretch", colorIndex: 2)
+
+        try store.setKept(read, on: today, kept: true)
+        try store.setKept(run, on: today, kept: true)
+        #expect(try store.awardCount() == 0, "two of three paid out")
+
+        try store.setKept(stretch, on: today, kept: true)
+        #expect(try store.awardCount() == 1)
+    }
+
+    /// What a partial day costs is the next star, never one already in the sky.
+    @Test func anIncompleteDayLeavesEarlierStarsAlone() throws {
+        let store = try makeStore()
+        let today = store.today()
+        let read = try store.addHabit(name: "Read", colorIndex: 0)
+        read.createdOn = today.advanced(by: -3)
+
+        // A complete day two days ago.
+        try store.setKept(read, on: today.advanced(by: -2), kept: true)
+        #expect(try store.awardCount() == 1)
+
+        // A second habit arrives, and today goes unfinished.
+        let run = try store.addHabit(name: "Run", colorIndex: 1)
+        try store.setKept(read, on: today, kept: true)
+        #expect(try store.awardCount() == 1, "an unfinished day took back a star")
+
+        try store.setKept(run, on: today, kept: true)
+        #expect(try store.awardCount() == 2)
     }
 
     @Test func perHabitRuleUnlocksOncePerHabit() throws {

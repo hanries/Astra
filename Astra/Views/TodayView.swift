@@ -12,6 +12,9 @@ struct TodayView: View {
     @Query(sort: [SortDescriptor(\Award.ordinal)]) private var awards: [Award]
 
     let progression: SkyProgression
+    /// Called once the unlock card is dismissed, so the app can take the user
+    /// to where the star now lives.
+    var onStarLit: (Star) -> Void = { _ in }
 
     @State private var showingAddHabit = false
     @State private var errorMessage: String?
@@ -109,7 +112,9 @@ struct TodayView: View {
                     constellation: celebration.constellation,
                     litCount: celebration.litCount
                 ) {
+                    let star = celebration.star
                     self.celebration = nil
+                    onStarLit(star)
                 }
                 .transition(.opacity)
             }
@@ -163,24 +168,28 @@ struct TodayView: View {
     /// Never mentions what was missed. The line either names what's next or
     /// marks the day done — there's no version of this that reads as a telling
     /// off.
+    /// Names what's next, or marks the day done. There's no wording of this
+    /// that reports what was missed — a partial day costs the next star, and
+    /// that's plain enough from the count above without being said twice.
     private var statusLine: String {
-        if activeHabits.isEmpty {
-            isViewingToday
+        guard !activeHabits.isEmpty else {
+            return isViewingToday
                 ? "Add a habit to start lighting the sky."
                 : "Nothing was being tracked on this day."
-        } else if done.isEmpty {
-            if isViewingToday, let next = progression.star(forOrdinal: awards.count) {
-                "Keep any habit today to light \(next.star.displayName)."
-            } else if isViewingToday {
-                "Keep any habit today to light a new star."
-            } else {
-                "Nothing kept. You can still fill it in."
-            }
-        } else if pending.isEmpty {
-            "Everything kept. The sky is brighter for it."
-        } else {
-            "\(pending.count) still to go."
         }
+        if pending.isEmpty {
+            return "Everything kept. The sky is brighter for it."
+        }
+        guard isViewingToday else {
+            return done.isEmpty
+                ? "Nothing kept. You can still fill it in."
+                : "\(pending.count) still to fill in."
+        }
+        let target = progression.star(forOrdinal: awards.count)?.star.displayName
+        let goal = target.map { "light \($0)" } ?? "light a new star"
+        return activeHabits.count == 1
+            ? "Keep it today to \(goal)."
+            : "Keep all \(activeHabits.count) today to \(goal)."
     }
 
     private var emptyState: some View {

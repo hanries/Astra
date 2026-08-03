@@ -10,6 +10,9 @@ struct SkyMapView: View {
     @Query(sort: [SortDescriptor(\Award.ordinal)]) private var awards: [Award]
 
     let progression: SkyProgression
+    /// Set when the user has just come here from lighting a star. Cleared once
+    /// the map has pointed at it, so it doesn't replay on every later visit.
+    @Binding var arrivingStar: Star?
 
     /// Presented with `sheet(item:)` rather than `sheet(isPresented:)`: the
     /// latter builds its content from whatever the state was when the flag
@@ -44,11 +47,19 @@ struct SkyMapView: View {
                 SkyChartView(
                     progression: progression,
                     catalog: catalog,
-                    litCount: awards.count
+                    litCount: awards.count,
+                    arrivingStar: arrivingStar
                 ) { star in
                     selectedStar = star
                 }
                 .ignoresSafeArea(edges: .bottom)
+                .task(id: arrivingStar?.hr) {
+                    guard arrivingStar != nil else { return }
+                    // Let the last ring finish, then the sky goes back to being
+                    // just the sky — a marker that stays becomes furniture.
+                    try? await Task.sleep(for: .seconds(3.4))
+                    arrivingStar = nil
+                }
 
                 if awards.isEmpty {
                     emptyState

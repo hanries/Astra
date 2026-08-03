@@ -30,7 +30,14 @@ final class HabitStore {
     private let calendar: Calendar
     private let rule: AwardRule
 
-    init(context: ModelContext, calendar: Calendar = .current, rule: AwardRule = AnyKeptDayRule()) {
+    /// A star is earned for a *complete* day — every habit that was live on it,
+    /// kept. A partial day earns nothing new.
+    ///
+    /// The forgiving part of the design lives elsewhere and still holds: a star
+    /// once earned is never revoked, consistency dips and recovers rather than
+    /// resetting, and any day can be corrected afterwards. What a partial day
+    /// costs is the *next* star, never one already in the sky.
+    init(context: ModelContext, calendar: Calendar = .current, rule: AwardRule = AllKeptDayRule()) {
         self.context  = context
         self.calendar = calendar
         self.rule     = rule
