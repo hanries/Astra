@@ -14,6 +14,7 @@ struct HabitHistoryView: View {
 
     @State private var month: DayKey = .today()
     @State private var errorMessage: String?
+    @State private var isEditing = false
 
     private var store: HabitStore { HabitStore(context: context) }
     private var today: DayKey { store.today() }
@@ -34,9 +35,17 @@ struct HabitHistoryView: View {
             .navigationTitle(habit.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Edit") { isEditing = true }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .sheet(isPresented: $isEditing) {
+                // Removing the habit from here leaves this screen showing
+                // something that no longer exists, so it closes too.
+                EditHabitSheet(habit: habit) { dismiss() }
             }
             .alert("Something went wrong", isPresented: .init(
                 get: { errorMessage != nil },

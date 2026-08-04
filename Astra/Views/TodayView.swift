@@ -17,6 +17,7 @@ struct TodayView: View {
     var onStarLit: (Star) -> Void = { _ in }
 
     @State private var showingAddHabit = false
+    @State private var showingManageHabits = false
     @State private var errorMessage: String?
     @State private var keptPulse = 0
     @State private var celebration: Celebration?
@@ -83,14 +84,30 @@ struct TodayView: View {
                 }
                 #endif
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingAddHabit = true } label: {
-                        Label("Add habit", systemImage: "plus")
+                    Menu {
+                        Button {
+                            showingAddHabit = true
+                        } label: {
+                            Label("Add habit", systemImage: "plus")
+                        }
+                        .disabled(habits.count { !$0.isArchived } >= HabitStore.maxActiveHabits)
+
+                        Button {
+                            showingManageHabits = true
+                        } label: {
+                            Label("Manage habits", systemImage: "slider.horizontal.3")
+                        }
+                        .disabled(habits.isEmpty)
+                    } label: {
+                        Label("Habits", systemImage: "plus")
                     }
-                    .disabled(activeHabits.count >= HabitStore.maxActiveHabits)
                 }
             }
             .sheet(isPresented: $showingAddHabit) {
                 AddHabitSheet().presentationDetents([.medium])
+            }
+            .sheet(isPresented: $showingManageHabits) {
+                ManageHabitsView()
             }
             .sheet(item: $historyHabit) { habit in
                 HabitHistoryView(habit: habit)

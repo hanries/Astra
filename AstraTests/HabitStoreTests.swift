@@ -6,13 +6,18 @@ import SwiftData
 @MainActor
 struct HabitStoreTests {
 
-    private func makeStore(rule: AwardRule = AnyKeptDayRule()) throws -> (HabitStore, ModelContext) {
+    /// Passing no rule uses the app's own default, so these exercise what ships.
+    /// This helper used to default to `AnyKeptDayRule` itself, which meant a
+    /// test could assert award behaviour and never touch the shipped rule.
+    private func makeStore(rule: AwardRule? = nil) throws -> (HabitStore, ModelContext) {
         let container = try ModelContainer(
             for: Habit.self, Completion.self, Award.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
-        return (HabitStore(context: context, rule: rule), context)
+        let store = rule.map { HabitStore(context: context, rule: $0) }
+            ?? HabitStore(context: context)
+        return (store, context)
     }
 
     // MARK: - Habits
@@ -78,6 +83,91 @@ struct HabitStoreTests {
 
         try store.reorder([c, a, b])
         #expect(try store.allHabits().map(\.name) == ["C", "A", "B"])
+    }
+
+    @Test func renameAndRecolour() throws {
+        let (store, _) = try makeStore()
+        let habit = try store.addHabit(name: "Reed", colorIndex: 0)
+
+        try store.rename(habit, to: "  Read before bed  ")
+        try store.setColor(habit, to: 3)
+        #expect(habit.name == "Read before bed")
+        #expect(habit.colorIndex == 3)
+    }
+
+    // MARK: - Removing
+
+    /// A habit added by mistake goes completely. Leaving a typo sitting in an
+    /// archive forever isn't a kindness.
+    @Test func deletesAHabitWithNoHistory() throws {
+        let (store, _) = try makeStore()
+        let habit = try store.addHabit(name: "Typoo", colorIndex: 0)
+        #expect(store.canDelete(habit))
+
+        try store.delete(habit)
+        #expect(try store.allHabits(includingArchived: true).isEmpty)
+    }
+
+    /// A habit with days against it can only stop, never vanish — deleting
+    /// would quietly rewrite days the user actually kept.
+    @Test func refusesToDeleteAHabitWithHistory() throws {
+        let (store, _) = try makeStore()
+        let habit = try store.addHabit(name: "Read", colorIndex: 0)
+        try store.setKept(habit, on: store.today(), kept: true)
+
+        #expect(store.canDelete(habit) == false)
+        #expect(throws: HabitStoreError.self) { try store.delete(habit) }
+        #expect(try store.allHabits().count == 1)
+    }
+
+    /// Deleting leaves the ledger alone: a star belongs to the day it was
+    /// earned, not to a habit.
+    @Test func deletingNeverTakesBackAStar() throws {
+        let (store, _) = try makeStore()
+        let keeper = try store.addHabit(name: "Read", colorIndex: 0)
+        try store.setKept(keeper, on: store.today(), kept: true)
+        #expect(try store.awardCount() == 1)
+
+        let spare = try store.addHabit(name: "Mistake", colorIndex: 1)
+        try store.delete(spare)
+        #expect(try store.awardCount() == 1)
+    }
+
+    /// Stopping a habit can finish the day — two habits with one kept becomes
+    /// one habit, kept. Without reconciling on archive the screen would read
+    /// "everything kept" while no star was ever granted.
+    @Test func archivingCanCompleteTheDay() throws {
+        let (store, _) = try makeStore()
+        let today = store.today()
+        let read = try store.addHabit(name: "Read", colorIndex: 0)
+        let run = try store.addHabit(name: "Run", colorIndex: 1)
+
+        try store.setKept(read, on: today, kept: true)
+        #expect(try store.awardCount() == 0)
+
+        try store.archive(run)
+        #expect(try store.awardCount() == 1, "the day never paid out after the other habit stopped")
+    }
+
+    @Test func unarchiveRestoresAHabit() throws {
+        let (store, _) = try makeStore()
+        let habit = try store.addHabit(name: "Read", colorIndex: 0)
+        try store.archive(habit)
+        #expect(try store.allHabits().isEmpty)
+
+        try store.unarchive(habit)
+        #expect(try store.allHabits().count == 1)
+        #expect(habit.isArchived == false)
+    }
+
+    @Test func unarchiveRefusesWhenSlotsAreFull() throws {
+        let (store, _) = try makeStore()
+        let retired = try store.addHabit(name: "Old", colorIndex: 0)
+        try store.archive(retired)
+        for i in 0..<HabitStore.maxActiveHabits {
+            try store.addHabit(name: "Habit \(i)", colorIndex: i)
+        }
+        #expect(throws: HabitStoreError.self) { try store.unarchive(retired) }
     }
 
     // MARK: - Keeping

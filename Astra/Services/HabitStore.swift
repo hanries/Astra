@@ -4,6 +4,7 @@ import SwiftData
 enum HabitStoreError: LocalizedError {
     case tooManyHabits(limit: Int)
     case habitNotActive(on: DayKey)
+    case hasHistory
 
     var errorDescription: String? {
         switch self {
@@ -11,6 +12,8 @@ enum HabitStoreError: LocalizedError {
             "You can track \(limit) habits at once."
         case .habitNotActive(let day):
             "That habit wasn't being tracked on \(day)."
+        case .hasHistory:
+            "This habit has days recorded against it, so it can only be stopped, not deleted."
         }
     }
 }
@@ -88,7 +91,28 @@ final class HabitStore {
         guard !habit.isArchived else { return }
         habit.archivedOn = today()
         try context.save()
+        // Retiring a habit can finish the day: two habits with one kept becomes
+        // one habit, kept. Without this the screen would say everything was
+        // kept while no star was ever granted.
+        try reconcileAwards(on: today())
     }
+
+    /// Removes a habit and everything it recorded.
+    ///
+    /// Only for a habit with no history — one added by mistake, or with a typo
+    /// in its name. Anything that has days against it gets archived instead,
+    /// because deleting would quietly rewrite days the user actually kept.
+    /// Awards are untouched either way: they belong to days, not to habits.
+    func delete(_ habit: Habit) throws {
+        guard habit.completions.isEmpty else { throw HabitStoreError.hasHistory }
+        context.delete(habit)
+        try context.save()
+        try reconcileAwards(on: today())
+    }
+
+    /// Whether `delete` will work — for choosing between offering "Delete" and
+    /// "Stop tracking".
+    func canDelete(_ habit: Habit) -> Bool { habit.completions.isEmpty }
 
     func unarchive(_ habit: Habit) throws {
         guard habit.isArchived else { return }
