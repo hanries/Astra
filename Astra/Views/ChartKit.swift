@@ -304,6 +304,88 @@ extension View {
     }
 }
 
+/// A menu drawn as a small ruled panel rather than a system dropdown.
+///
+/// The stock `Menu` renders a translucent rounded card with SF Symbols down one
+/// side — the single most recognisable control in iOS, and the one thing on the
+/// screen that still announced which toolkit built this app. This is the same
+/// list, ruled and squared, with no icons: two or three words of plain English
+/// need no glyph beside them to be understood.
+struct AtlasMenu: View {
+    struct Entry: Identifiable {
+        let id = UUID()
+        let label: String
+        var isEnabled = true
+        let action: () -> Void
+    }
+
+    let entries: [Entry]
+    let onDismiss: () -> Void
+
+    @State private var revealed = false
+
+    /// Standard inline navigation bar height. Fixed rather than measured
+    /// because the bar is a sibling of this overlay, not an ancestor, so its
+    /// frame isn't readable from here.
+    private let navigationBarHeight: CGFloat = 44
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // A scrim thin enough to keep the page readable behind it — this is
+            // a small choice, not a modal decision.
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture(perform: dismiss)
+
+            VStack(spacing: 0) {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    Button {
+                        entry.action()
+                        dismiss()
+                    } label: {
+                        Text(entry.label)
+                            .font(.system(size: 15))
+                            .foregroundStyle(entry.isEnabled ? Theme.starlight : Theme.unlit)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!entry.isEnabled)
+
+                    if index < entries.count - 1 {
+                        Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
+                    }
+                }
+            }
+            .frame(width: 210)
+            .background(Theme.surface)
+            .overlay {
+                Rectangle().strokeBorder(Theme.ruleStrong, lineWidth: Theme.hairline)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+            // Grows out of the control that opened it, rather than fading in
+            // from nowhere.
+            .scaleEffect(revealed ? 1 : 0.94, anchor: .topTrailing)
+            .opacity(revealed ? 1 : 0)
+            .padding(.trailing, 16)
+            // The overlay's space starts at the safe area, not below the
+            // navigation bar, so the panel has to clear the bar's own height or
+            // it covers the control that opened it.
+            .padding(.top, navigationBarHeight + 4)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) { revealed = true }
+        }
+    }
+
+    private func dismiss() {
+        withAnimation(.easeIn(duration: 0.14)) { revealed = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14, execute: onDismiss)
+    }
+}
+
 /// A short, squared confirmation drawn in the app's own grammar.
 ///
 /// Replaces `alert` and `confirmationDialog`, whose rounded translucent cards

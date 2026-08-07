@@ -18,6 +18,7 @@ struct TodayView: View {
 
     @State private var showingAddHabit = false
     @State private var showingManageHabits = false
+    @State private var showingMenu = false
     @State private var errorMessage: String?
     @State private var keptPulse = 0
     @State private var celebration: Celebration?
@@ -35,6 +36,10 @@ struct TodayView: View {
     private var activeHabits: [Habit] {
         habits.filter { !$0.isArchived && $0.isActive(on: selectedDay) }
     }
+
+    /// Counted across every day, not just the shown one — the five-habit cap
+    /// applies to what's being tracked, not to what was live last Tuesday.
+    private var activeHabitCount: Int { habits.count { !$0.isArchived } }
 
     private var pending: [Habit] { activeHabits.filter { !store.isKept($0, on: selectedDay) } }
     private var done: [Habit] { activeHabits.filter { store.isKept($0, on: selectedDay) } }
@@ -106,23 +111,23 @@ struct TodayView: View {
                 }
                 #endif
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            showingAddHabit = true
-                        } label: {
-                            Label("Add habit", systemImage: "plus")
-                        }
-                        .disabled(habits.count { !$0.isArchived } >= HabitStore.maxActiveHabits)
-
-                        Button {
-                            showingManageHabits = true
-                        } label: {
-                            Label("Manage habits", systemImage: "slider.horizontal.3")
-                        }
-                        .disabled(habits.isEmpty)
+                    Button {
+                        withAnimation(nil) { showingMenu = true }
                     } label: {
-                        Label("Habits", systemImage: "plus")
+                        // A drawn cross rather than the system plus, so the one
+                        // control in the bar matches the marks used everywhere
+                        // else in the app.
+                        ZStack {
+                            Rectangle().fill(Theme.starlight).frame(width: 15, height: 1.5)
+                            Rectangle().fill(Theme.starlight).frame(width: 1.5, height: 15)
+                        }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                     }
+                    // Plain, or iOS 26 wraps it in the capsule it gives every
+                    // toolbar button — the last piece of system chrome in the bar.
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Habits")
                 }
             }
             .atlasSheet(isPresented: $showingAddHabit, detents: [.medium]) {
@@ -137,6 +142,22 @@ struct TodayView: View {
             .atlasAlert("Couldn't do that", message: $errorMessage)
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: keptPulse)
+        .overlay {
+            if showingMenu {
+                AtlasMenu(entries: [
+                    .init(
+                        label: "Add habit",
+                        isEnabled: activeHabitCount < HabitStore.maxActiveHabits
+                    ) { showingAddHabit = true },
+                    .init(
+                        label: "Manage habits",
+                        isEnabled: !habits.isEmpty
+                    ) { showingManageHabits = true },
+                ]) {
+                    showingMenu = false
+                }
+            }
+        }
         .overlay {
             if let celebration {
                 StarUnlockView(
