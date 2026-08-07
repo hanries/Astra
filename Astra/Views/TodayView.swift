@@ -125,23 +125,16 @@ struct TodayView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingAddHabit) {
-                AddHabitSheet().presentationDetents([.medium])
+            .atlasSheet(isPresented: $showingAddHabit, detents: [.medium]) {
+                AddHabitSheet()
             }
-            .sheet(isPresented: $showingManageHabits) {
+            .atlasSheet(isPresented: $showingManageHabits) {
                 ManageHabitsView()
             }
-            .sheet(item: $historyHabit) { habit in
+            .atlasSheet(item: $historyHabit) { habit in
                 HabitHistoryView(habit: habit)
             }
-            .alert("Something went wrong", isPresented: .init(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .atlasAlert("Couldn't do that", message: $errorMessage)
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: keptPulse)
         .overlay {
@@ -378,6 +371,7 @@ struct AddHabitSheet: View {
     @State private var name = ""
     @State private var colorIndex = 0
     @State private var errorMessage: String?
+    @FocusState private var isNameFocused: Bool
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -391,57 +385,63 @@ struct AddHabitSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 24) {
-                TextField("Habit name", text: $name, prompt: Text("Work out for an hour"))
-                    .textFieldStyle(.plain)
-                    .font(.title3)
-                    .foregroundStyle(Theme.starlight)
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
-                    .submitLabel(.done)
-                    .onSubmit(save)
-
-                HStack(spacing: 16) {
-                    ForEach(0..<Theme.habitPalette.count, id: \.self) { index in
-                        Button {
-                            colorIndex = index
-                        } label: {
-                            Circle()
-                                .fill(Theme.habitPalette[index])
-                                .frame(width: 34, height: 34)
-                                .overlay {
-                                    if index == colorIndex {
-                                        Circle().stroke(Theme.starlight, lineWidth: 2).padding(-5)
-                                    }
-                                }
+        AtlasPanel(
+            title: "New habit",
+            leading: .init(label: "Cancel") { dismiss() },
+            trailing: .init(label: "Add", isProminent: true, isEnabled: !trimmedName.isEmpty, action: save)
+        ) {
+            VStack(alignment: .leading, spacing: 30) {
+                VStack(alignment: .leading, spacing: 10) {
+                    MarginLabel(text: "Name")
+                    TextField("", text: $name, prompt: Text("Work out for an hour")
+                        .foregroundStyle(Theme.unlit))
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 19))
+                        .foregroundStyle(Theme.starlight)
+                        .tint(Theme.habitColor(colorIndex))
+                        .focused($isNameFocused)
+                        .submitLabel(.done)
+                        .onSubmit(save)
+                        .padding(.bottom, 9)
+                        .overlay(alignment: .bottom) {
+                            Rectangle().fill(Theme.ruleStrong).frame(height: Theme.hairline)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Colour \(index + 1)")
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    MarginLabel(text: "Key")
+                    HStack(spacing: 0) {
+                        ForEach(0..<Theme.habitPalette.count, id: \.self) { index in
+                            Button {
+                                colorIndex = index
+                            } label: {
+                                VStack(spacing: 8) {
+                                    Rectangle()
+                                        .fill(Theme.habitPalette[index])
+                                        .frame(width: 22, height: 22)
+                                    Rectangle()
+                                        .fill(index == colorIndex ? Theme.starlight : .clear)
+                                        .frame(width: 22, height: 2)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Colour \(index + 1)")
+                            .accessibilityAddTraits(index == colorIndex ? [.isSelected] : [])
+                        }
                     }
                 }
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                }
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .padding(20)
-            .background(Theme.background)
-            .navigationTitle("New habit")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add", action: save).disabled(trimmedName.isEmpty)
-                }
-            }
-            .onAppear { colorIndex = suggestedColorIndex }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
         }
+        .onAppear {
+            colorIndex = suggestedColorIndex
+            isNameFocused = true
+        }
+        .atlasAlert("Couldn't add that", message: $errorMessage)
     }
 
     private func save() {

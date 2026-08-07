@@ -88,13 +88,13 @@ struct StarScaleComparison: View {
 
     var body: some View {
         if let radii = star.approximateSolarRadii {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Compared to the Sun")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Theme.subdued)
+            VStack(alignment: .leading, spacing: 16) {
+                MarginLabel(text: "Against the Sun")
 
-                HStack(alignment: .bottom, spacing: 30) {
-                    VStack(spacing: 8) {
+                // Both discs stand on one baseline so the comparison is read
+                // by height, the way a scale figure works on a chart.
+                HStack(alignment: .bottom, spacing: 34) {
+                    labelled(caption: sizeCaption(radii), width: starDiameter) {
                         StarPortrait(
                             star: star,
                             diameter: starDiameter,
@@ -102,11 +102,8 @@ struct StarScaleComparison: View {
                             isAnimated: false
                         )
                         .frame(width: starDiameter, height: starDiameter)
-                        Text(sizeCaption(radii))
-                            .font(.caption2)
-                            .foregroundStyle(Theme.subdued)
                     }
-                    VStack(spacing: 8) {
+                    labelled(caption: "the Sun", width: sunDiameter) {
                         Circle()
                             .fill(
                                 RadialGradient(
@@ -121,34 +118,48 @@ struct StarScaleComparison: View {
                             )
                             .frame(width: sunDiameter, height: sunDiameter)
                             .shadow(color: Color(red: 1, green: 0.8, blue: 0.4).opacity(0.55), radius: 7)
-                        Text("the Sun")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.subdued)
                     }
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text("Logarithmic scale. Size is estimated from spectral class, not measured.")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.subdued.opacity(0.8))
+                Text("Logarithmic scale. Size estimated from spectral class, not measured.")
+                    .font(Theme.figure(10))
+                    .foregroundStyle(Theme.unlit)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
             }
-            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    private func labelled<Content: View>(
+        caption: String,
+        width: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(spacing: 10) {
+            content()
+            Rectangle()
+                .fill(Theme.rule)
+                .frame(width: max(width, 44), height: Theme.hairline)
+            Text(caption)
+                .font(Theme.figure(10))
+                .foregroundStyle(Theme.subdued)
+                .frame(width: max(width, 72))
+                .multilineTextAlignment(.center)
         }
     }
 
     private func sizeCaption(_ radii: Double) -> String {
         if radii >= 10 {
-            "about \(Int(radii.rounded()))× as wide"
+            "\(Int(radii.rounded()))× wider"
         } else if radii >= 1.15 {
-            "about \(radii.formatted(.number.precision(.fractionLength(1))))× as wide"
+            "\(radii.formatted(.number.precision(.fractionLength(1))))× wider"
         } else if radii <= 0.85 {
-            "smaller than the Sun"
+            "smaller"
         } else {
-            "about the Sun's size"
+            "about equal"
         }
     }
 }

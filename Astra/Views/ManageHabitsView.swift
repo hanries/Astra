@@ -20,17 +20,27 @@ struct ManageHabitsView: View {
     private var archived: [Habit] { habits.filter(\.isArchived) }
 
     var body: some View {
-        NavigationStack {
+        AtlasPanel(
+            title: "Habits",
+            provenance: ["\(active.count) of \(HabitStore.maxActiveHabits) tracked"],
+            trailing: .init(label: "Done", isProminent: true) { dismiss() }
+        ) {
+            // A List, not a VStack, purely because reordering needs it — but
+            // stripped of every default surface so it reads as ruled entries
+            // rather than as an inset-grouped settings screen.
             List {
                 Section {
                     ForEach(active) { habit in
                         row(habit)
                     }
                     .onMove(perform: move)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 12))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 } header: {
-                    Text("Tracking")
-                } footer: {
-                    Text("Drag to reorder. \(active.count) of \(HabitStore.maxActiveHabits) slots used.")
+                    MarginLabel(text: "Tracking")
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 4)
                 }
 
                 if !archived.isEmpty {
@@ -38,93 +48,82 @@ struct ManageHabitsView: View {
                         ForEach(archived) { habit in
                             archivedRow(habit)
                         }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     } header: {
-                        Text("Stopped")
+                        MarginLabel(text: "Stopped")
+                            .padding(.horizontal, 20)
+                            .padding(.top, 22)
+                            .padding(.bottom, 4)
                     } footer: {
                         Text("Their days still count and the stars they lit are still in the sky.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.unlit)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+            .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Theme.background)
             .environment(\.editMode, .constant(.active))
-            .navigationTitle("Manage habits")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .sheet(item: $editing) { habit in
-                EditHabitSheet(habit: habit)
-            }
-            .alert("Something went wrong", isPresented: .init(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "")
-            }
         }
+        .atlasSheet(item: $editing) { habit in
+            EditHabitSheet(habit: habit)
+        }
+        .atlasAlert("Couldn't do that", message: $errorMessage)
     }
 
     private func row(_ habit: Habit) -> some View {
-        Button {
-            editing = habit
-        } label: {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(Theme.habitColor(habit.colorIndex))
-                    .frame(width: 10, height: 10)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(habit.name)
-                        .foregroundStyle(Theme.starlight)
-                    Text("^[\(habit.completions.count) day](inflect: true) recorded")
-                        .font(.caption)
-                        .foregroundStyle(Theme.subdued)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.unlit)
-            }
+        RuledEntry(
+            swatch: Theme.habitColor(habit.colorIndex),
+            title: habit.name,
+            subtitle: "^[\(habit.completions.count) day](inflect: true) recorded"
+        ) {
+            EmptyView()
         }
-        .listRowBackground(Theme.surface)
+        .contentShape(Rectangle())
+        .onTapGesture { editing = habit }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 act { try store.archive(habit) }
             } label: {
-                Label("Stop", systemImage: "pause.circle")
+                Text("Stop")
             }
         }
     }
 
     private func archivedRow(_ habit: Habit) -> some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(Theme.habitColor(habit.colorIndex).opacity(0.4))
-                .frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(habit.name)
-                    .foregroundStyle(Theme.subdued)
-                if let stopped = habit.archivedOn {
-                    Text("Stopped \(stopped.date().formatted(.dateTime.month().day()))")
-                        .font(.caption)
-                        .foregroundStyle(Theme.unlit)
-                }
-            }
-            Spacer()
-            Button("Start again") {
+        RuledEntry(
+            swatch: Theme.habitColor(habit.colorIndex),
+            title: habit.name,
+            subtitle: habit.archivedOn.map {
+                "stopped \($0.date().formatted(.dateTime.day().month(.abbreviated)))"
+            },
+            isSpent: true
+        ) {
+            Button {
                 act { try store.unarchive(habit) }
+            } label: {
+                Text("START AGAIN")
+                    .font(Theme.label(9))
+                    .kerning(1.1)
+                    .foregroundStyle(active.count >= HabitStore.maxActiveHabits
+                                     ? Theme.rule : Theme.starlight)
+                    .padding(.vertical, 7)
+                    .padding(.horizontal, 10)
+                    .overlay {
+                        Rectangle()
+                            .strokeBorder(active.count >= HabitStore.maxActiveHabits
+                                          ? Theme.rule : Theme.ruleStrong,
+                                          lineWidth: Theme.hairline)
+                    }
             }
-            .font(.footnote.weight(.medium))
-            .buttonStyle(.borderless)
-            .tint(Theme.starlight)
+            .buttonStyle(.plain)
             .disabled(active.count >= HabitStore.maxActiveHabits)
         }
-        .listRowBackground(Theme.surface.opacity(0.5))
     }
 
     /// `onMove` hands back indices into the active list, so the reorder is

@@ -22,63 +22,47 @@ struct HabitHistoryView: View {
     private var tint: Color { Theme.habitColor(habit.colorIndex) }
 
     var body: some View {
-        NavigationStack {
+        AtlasPanel(
+            title: habit.name,
+            provenance: ["since \(habit.createdOn.date().formatted(.dateTime.month(.abbreviated).year()))"],
+            leading: .init(label: "Edit") { isEditing = true },
+            trailing: .init(label: "Done", isProminent: true) { dismiss() }
+        ) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     statRow
                     monthSection
-                    sinceLine
                 }
-                .padding(20)
-            }
-            .background(Theme.background)
-            .navigationTitle(habit.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Edit") { isEditing = true }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .sheet(isPresented: $isEditing) {
-                // Removing the habit from here leaves this screen showing
-                // something that no longer exists, so it closes too.
-                EditHabitSheet(habit: habit) { dismiss() }
-            }
-            .alert("Something went wrong", isPresented: .init(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "")
+                .padding(.horizontal, 20)
+                .padding(.top, 22)
+                .padding(.bottom, 32)
             }
         }
+        .atlasSheet(isPresented: $isEditing) {
+            // Removing the habit from here leaves this screen showing
+            // something that no longer exists, so it closes too.
+            EditHabitSheet(habit: habit) { dismiss() }
+        }
+        .atlasAlert("Couldn't save that", message: $errorMessage)
     }
 
     // MARK: - Stats
 
+    /// Three readings in a row, ruled off rather than boxed, with the figures
+    /// on a shared baseline so they read as one line of a table.
     private var statRow: some View {
-        HStack(spacing: 0) {
-            stat(
-                value: "\(Stats.totalKept(keptDays: keptDays))",
-                label: "days kept"
-            )
-            divider
-            stat(
-                value: consistencyText,
-                label: "last 30 days"
-            )
-            divider
-            stat(
-                value: "\(Stats.longestRun(keptDays: keptDays))",
-                label: "longest run"
-            )
+        VStack(spacing: 0) {
+            Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                stat(value: "\(Stats.totalKept(keptDays: keptDays))", label: "days kept")
+                divider
+                stat(value: consistencyText, label: "last 30")
+                divider
+                stat(value: "\(Stats.longestRun(keptDays: keptDays))", label: "longest run")
+            }
+            .padding(.vertical, 16)
+            Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
         }
-        .padding(.vertical, 18)
-        .background(Theme.surface.opacity(0.6), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var consistencyText: String {
@@ -92,48 +76,44 @@ struct HabitHistoryView: View {
     }
 
     private func stat(value: String, label: String) -> some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 5) {
             Text(value)
-                .font(.title2.weight(.semibold).monospacedDigit())
+                .font(Theme.figure(24, weight: .light))
                 .foregroundStyle(tint)
                 .contentTransition(.numericText())
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(Theme.subdued)
+            Text(label.uppercased())
+                .font(Theme.label(9))
+                .kerning(1.1)
+                .foregroundStyle(Theme.unlit)
         }
         .frame(maxWidth: .infinity)
     }
 
     private var divider: some View {
         Rectangle()
-            .fill(Theme.unlit.opacity(0.4))
-            .frame(width: 0.5, height: 30)
+            .fill(Theme.rule)
+            .frame(width: Theme.hairline, height: 34)
     }
 
     // MARK: - Month
 
     private var monthSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Button {
-                    shiftMonth(by: -1)
-                } label: {
-                    Image(systemName: "chevron.left").foregroundStyle(Theme.subdued)
-                }
-                Spacer()
-                Text(month.date().formatted(.dateTime.month(.wide).year()))
-                    .font(.headline)
+            HStack(spacing: 14) {
+                Text(month.date().formatted(.dateTime.month(.wide).year()).uppercased())
+                    .font(Theme.label(11))
+                    .kerning(1.5)
                     .foregroundStyle(Theme.starlight)
-                Spacer()
-                Button {
-                    shiftMonth(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(canGoForward ? Theme.subdued : Theme.unlit)
+                Rectangle()
+                    .fill(Theme.rule)
+                    .frame(height: Theme.hairline)
+                // Paging set as marks on the rule rather than as chevrons,
+                // which are the same glyph every app uses.
+                HStack(spacing: 14) {
+                    monthStep("−", enabled: true) { shiftMonth(by: -1) }
+                    monthStep("+", enabled: canGoForward) { shiftMonth(by: 1) }
                 }
-                .disabled(!canGoForward)
             }
-            .buttonStyle(.plain)
 
             HabitMonthGrid(
                 month: month,
@@ -145,9 +125,42 @@ struct HabitHistoryView: View {
                 toggle(day)
             }
 
-            Text("Tap any day to correct it.")
-                .font(.caption)
-                .foregroundStyle(Theme.subdued)
+            HStack(spacing: 14) {
+                key(filled: true, text: "kept")
+                key(filled: false, text: "not kept")
+                Spacer()
+                Text("TAP TO CORRECT")
+                    .font(Theme.label(9))
+                    .kerning(1.1)
+                    .foregroundStyle(Theme.unlit)
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func monthStep(_ glyph: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(glyph)
+                .font(Theme.figure(15))
+                .foregroundStyle(enabled ? Theme.subdued : Theme.rule)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+
+    /// The legend a chart carries, so the marks below don't have to be guessed.
+    private func key(filled: Bool, text: String) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(filled ? tint : .clear)
+                .stroke(filled ? .clear : Theme.unlit, lineWidth: Theme.hairline)
+                .frame(width: 8, height: 8)
+            Text(text.uppercased())
+                .font(Theme.label(9))
+                .kerning(1.1)
+                .foregroundStyle(Theme.unlit)
         }
     }
 
@@ -159,13 +172,6 @@ struct HabitHistoryView: View {
         let anchor = DayKey(rawValue: month.year * 10_000 + month.month * 100 + 15)
         let moved = Calendar.current.date(byAdding: .month, value: months, to: anchor.date())
         month = DayKey(moved ?? anchor.date())
-    }
-
-    @ViewBuilder
-    private var sinceLine: some View {
-        Text("Tracked since \(habit.createdOn.date().formatted(.dateTime.month(.wide).day().year()))")
-            .font(.footnote)
-            .foregroundStyle(Theme.subdued)
     }
 
     private func toggle(_ day: DayKey) {
@@ -198,9 +204,10 @@ private struct HabitMonthGrid: View {
         VStack(spacing: 8) {
             HStack {
                 ForEach(weekdaySymbols, id: \.self) { symbol in
-                    Text(symbol)
-                        .font(.caption2)
-                        .foregroundStyle(Theme.subdued.opacity(0.7))
+                    Text(symbol.uppercased())
+                        .font(Theme.label(9))
+                        .kerning(0.8)
+                        .foregroundStyle(Theme.unlit)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -236,7 +243,7 @@ private struct HabitMonthGrid: View {
                     Circle().stroke(tint.opacity(0.8), lineWidth: 1.5)
                 }
                 Text("\(day.day)")
-                    .font(.caption.monospacedDigit())
+                    .font(Theme.figure(12))
                     .foregroundStyle(
                         kept ? Theme.background
                             : (selectable ? Theme.starlight.opacity(0.75) : Theme.unlit)

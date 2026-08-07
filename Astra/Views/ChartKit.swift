@@ -236,6 +236,8 @@ struct AtlasPanel<Content: View>: View {
         .background(Theme.background)
     }
 
+    /// Both slots reserve the same width whether or not they hold a button, so
+    /// the title stays optically centred on a panel with only one action.
     @ViewBuilder
     private func actionButton(_ action: PanelAction?, alignment: Alignment) -> some View {
         Group {
@@ -248,7 +250,57 @@ struct AtlasPanel<Content: View>: View {
                 .disabled(!action.isEnabled)
             }
         }
-        .frame(minWidth: 56, alignment: alignment)
+        .frame(width: 64, alignment: alignment)
+    }
+}
+
+extension View {
+    /// Presents a sheet as a page of the atlas rather than a system card.
+    ///
+    /// Strips the system's own chrome — the grabber, the inset rounded card —
+    /// and puts an `AtlasPanel` header in its place, so a sheet reads as
+    /// turning to another page rather than as a card sliding over one.
+    func atlasSheet<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        detents: Set<PresentationDetent> = [.large],
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        sheet(item: item) { value in
+            content(value)
+                .presentationDetents(detents)
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Theme.background)
+        }
+    }
+
+    /// The `isPresented` form of `atlasSheet`.
+    func atlasSheet<Content: View>(
+        isPresented: Binding<Bool>,
+        detents: Set<PresentationDetent> = [.large],
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        sheet(isPresented: isPresented) {
+            content()
+                .presentationDetents(detents)
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Theme.background)
+        }
+    }
+
+    /// Replaces `.alert` with the app's own dialog.
+    ///
+    /// Kept as a binding to an optional message so a failure surfaces the same
+    /// way everywhere, rather than each screen inventing its own presentation.
+    func atlasAlert(_ title: String, message: Binding<String?>) -> some View {
+        overlay {
+            if let text = message.wrappedValue {
+                AtlasDialog(title: title, message: text) {
+                    message.wrappedValue = nil
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: message.wrappedValue)
     }
 }
 

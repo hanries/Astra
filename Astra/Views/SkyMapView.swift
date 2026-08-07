@@ -68,15 +68,30 @@ struct SkyMapView: View {
                 }
             }
             .background(Theme.background)
-            .navigationTitle("Sky")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(item: $selectedStar) { star in
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("SKY")
+                            .font(Theme.label(11))
+                            .kerning(1.8)
+                            .foregroundStyle(Theme.starlight)
+                        // The epoch every real chart carries. It's true, it's
+                        // small, and it tells you the thing was made from data.
+                        Text("J2000.0")
+                            .font(Theme.figure(9))
+                            .kerning(0.5)
+                            .foregroundStyle(Theme.unlit)
+                    }
+                }
+            }
+            .atlasSheet(item: $selectedStar, detents: [.large]) { star in
                 StarDetailSheet(
                     star: star,
                     isLit: isLit(star),
                     litOn: litDay(star)
                 )
-                .presentationDetents([.medium])
             }
         }
     }
@@ -85,65 +100,94 @@ struct SkyMapView: View {
 
     /// The numbers that make the work legible. Stars lit is the headline
     /// because it's exactly the number of days shown up — one star, one day.
+    /// The chart's readings, ruled off top and bottom over the field.
+    ///
+    /// Rules rather than a floating rounded panel: the chart is the content,
+    /// and a card hovering over it would hide sky. A pair of hairlines states
+    /// the figures without taking a rectangle out of the view.
     private var stats: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 0) {
-                statTile(value: "\(awards.count)", label: awards.count == 1 ? "star lit" : "stars lit")
+        VStack(spacing: 0) {
+            Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                statTile(value: "\(awards.count)", label: awards.count == 1 ? "star" : "stars")
                 divider
-                statTile(value: "\(completedCount)", label: completedCount == 1 ? "figure done" : "figures done")
+                statTile(value: "\(completedCount)", label: "figures")
                 divider
                 statTile(
-                    value: skyShare.formatted(.percent.precision(.fractionLength(0))),
-                    label: "of the sky"
+                    value: "\(Int((skyShare * 100).rounded()))%",
+                    label: "of sky"
                 )
             }
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .padding(.vertical, 11)
+            Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
 
             if let active {
-                Text("\(active.constellation.name) · \(active.litCount) of \(active.constellation.starCount)")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.subdued)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(.ultraThinMaterial, in: Capsule())
+                HStack(spacing: 8) {
+                    Text(active.constellation.name.uppercased())
+                        .font(Theme.label(10))
+                        .kerning(1.4)
+                        .foregroundStyle(Theme.subdued)
+                    Text("\(active.litCount)/\(active.constellation.starCount)")
+                        .font(Theme.figure(10))
+                        .foregroundStyle(Theme.unlit)
+                }
+                .padding(.top, 9)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 20)
+        .background {
+            // Only enough scrim to keep the figures legible where the field is
+            // dense — not a panel.
+            LinearGradient(
+                colors: [Theme.background, Theme.background.opacity(0.82), .clear],
+                startPoint: .top, endPoint: .bottom
+            )
+            .padding(.horizontal, -20)
+            .padding(.top, -40)
+            .padding(.bottom, -24)
+        }
         .allowsHitTesting(false)
     }
 
     private func statTile(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             Text(value)
-                .font(.title3.weight(.semibold).monospacedDigit())
+                .font(Theme.figure(21, weight: .light))
                 .foregroundStyle(Theme.starlight)
                 .contentTransition(.numericText())
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(Theme.subdued)
+            Text(label.uppercased())
+                .font(Theme.label(9))
+                .kerning(1.1)
+                .foregroundStyle(Theme.unlit)
         }
         .frame(maxWidth: .infinity)
     }
 
     private var divider: some View {
         Rectangle()
-            .fill(Theme.unlit.opacity(0.4))
-            .frame(width: 0.5, height: 28)
+            .fill(Theme.rule)
+            .frame(width: Theme.hairline, height: 30)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Text("Your sky is dark.")
-                .font(.title3.weight(.medium))
-                .foregroundStyle(Theme.starlight)
-            Text("Keep a habit today and the first star lights.")
-                .font(.callout)
+        VStack(alignment: .leading, spacing: 7) {
+            Text("NO STARS LIT")
+                .font(Theme.label(10))
+                .kerning(1.5)
                 .foregroundStyle(Theme.subdued)
+            Text("Keep every habit today and the first one lights.")
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.unlit)
         }
-        .padding(20)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
+        }
         .allowsHitTesting(false)
     }
 
@@ -175,56 +219,112 @@ struct StarDetailSheet: View {
     let isLit: Bool
     let litOn: DayKey?
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                // The portrait leads. A star you've earned should look like a
-                // star, not like a bullet point.
-                StarPortrait(star: star, diameter: 190)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 240)
-                    // Unlit stars are shown as they *will* look, dimmed —
-                    // something to walk towards rather than a blank.
-                    .opacity(isLit ? 1 : 0.35)
-                    .saturation(isLit ? 1 : 0.5)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(star.displayName)
-                        .font(.title.weight(.semibold))
-                        .foregroundStyle(Theme.starlight)
-                    if let bayer = star.bayer, star.name != nil {
-                        Text(bayer)
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.subdued)
-                    }
-                    if let litOn {
-                        Text("Lit on \(litOn.date().formatted(.dateTime.month(.wide).day()))")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.subdued)
-                            .padding(.top, 4)
-                    } else if !isLit {
-                        Text("Not yet lit")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.subdued)
-                            .padding(.top, 4)
-                    }
+        AtlasPanel(
+            title: star.displayName,
+            provenance: provenance,
+            trailing: .init(label: "Done", isProminent: true) { dismiss() }
+        ) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    portrait
+                    readings
+                    StarScaleComparison(star: star)
                 }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(factLines, id: \.self) { line in
-                        Text(line)
-                            .font(.callout)
-                            .foregroundStyle(Theme.starlight.opacity(0.85))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                StarScaleComparison(star: star)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 36)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(24)
         }
-        .background(Theme.background)
+    }
+
+    /// Catalogue number, Bayer designation and the date lit — the line a plate
+    /// carries so you know what you're looking at and where it came from.
+    private var provenance: [String] {
+        var parts = ["HR \(star.hr)"]
+        if let bayer = star.bayer, star.name != nil { parts.append(bayer) }
+        if let litOn {
+            parts.append("lit \(litOn.date().formatted(.dateTime.day().month(.abbreviated)))")
+        } else if !isLit {
+            parts.append("not yet lit")
+        }
+        return parts
+    }
+
+    /// The star with its measurements set around it.
+    ///
+    /// This is the one screen in the app with a single hero object, which is
+    /// exactly the condition annotations-over-the-subject are for — a spec
+    /// table would put the numbers somewhere you have to look them up, and here
+    /// they can simply sit against the thing they describe.
+    private var portrait: some View {
+        ZStack {
+            StarPortrait(star: star, diameter: 172)
+                // Unlit stars show as they *will* look, dimmed — something to
+                // walk towards rather than a blank.
+                .opacity(isLit ? 1 : 0.3)
+                .saturation(isLit ? 1 : 0.45)
+
+            VStack {
+                HStack {
+                    annotation("mag \(star.magnitude.formatted(.number.precision(.fractionLength(2))))")
+                    Spacer()
+                }
+                Spacer()
+                HStack {
+                    Spacer()
+                    if let kelvin = star.temperatureKelvin {
+                        annotation("\(Int((kelvin / 100).rounded()) * 100) K")
+                    }
+                }
+                Spacer()
+                HStack {
+                    if let distance = star.distanceLightYears {
+                        annotation("\(Int(distance.rounded())) ly")
+                    } else if let type = star.spectralType?.prefix(6) {
+                        annotation(String(type).trimmingCharacters(in: .whitespaces))
+                    }
+                    Spacer()
+                }
+            }
+            .frame(height: 208)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 250)
+    }
+
+    /// An annotation ruled to the object, as a chart labels a feature: a mark,
+    /// a leader line, then the value.
+    private func annotation(_ text: String) -> some View {
+        HStack(spacing: 6) {
+            Rectangle()
+                .fill(Theme.ruleStrong)
+                .frame(width: 14, height: Theme.hairline)
+            Text(text)
+                .font(Theme.figure(11))
+                .foregroundStyle(Theme.starlight.opacity(0.9))
+        }
+        .padding(.vertical, 3)
+    }
+
+    private var readings: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            MarginLabel(text: "Notes")
+                .padding(.bottom, 10)
+            ForEach(factLines, id: \.self) { line in
+                Text(line)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.starlight.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 9)
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
+                    }
+            }
+        }
     }
 
     /// True sentences from catalogue fields. No adjective the data doesn't

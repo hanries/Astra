@@ -33,7 +33,7 @@ struct JournalView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 26) {
                     monthHeader
                     MonthGrid(
                         month: displayedMonth,
@@ -44,39 +44,59 @@ struct JournalView: View {
                     }
                     consistencyFooter
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 32)
             }
             .background(Theme.background)
-            .navigationTitle("Log")
-            .sheet(item: $selectedDay) { day in
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("LOG")
+                            .font(Theme.label(11))
+                            .kerning(1.8)
+                            .foregroundStyle(Theme.starlight)
+                        Text(displayedMonth.date().formatted(.dateTime.month(.abbreviated).year()))
+                            .font(Theme.figure(9))
+                            .kerning(0.5)
+                            .foregroundStyle(Theme.unlit)
+                    }
+                }
+            }
+            .atlasSheet(item: $selectedDay, detents: [.medium]) { day in
                 DaySheet(day: day)
-                    .presentationDetents([.medium])
             }
         }
     }
 
     private var monthHeader: some View {
-        HStack {
-            Button {
-                displayedMonth = monthShifted(by: -1)
-            } label: {
-                Image(systemName: "chevron.left")
-                    .foregroundStyle(Theme.subdued)
-            }
-            Spacer()
-            Text(displayedMonth.date().formatted(.dateTime.month(.wide).year()))
-                .font(.headline)
+        HStack(spacing: 14) {
+            Text(displayedMonth.date().formatted(.dateTime.month(.wide)).uppercased())
+                .font(Theme.label(11))
+                .kerning(1.5)
                 .foregroundStyle(Theme.starlight)
-            Spacer()
-            Button {
-                displayedMonth = monthShifted(by: 1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(canGoForward ? Theme.subdued : Theme.unlit)
+            Rectangle()
+                .fill(Theme.rule)
+                .frame(height: Theme.hairline)
+            HStack(spacing: 14) {
+                monthStep("−", enabled: true) { displayedMonth = monthShifted(by: -1) }
+                monthStep("+", enabled: canGoForward) { displayedMonth = monthShifted(by: 1) }
             }
-            .disabled(!canGoForward)
+        }
+    }
+
+    private func monthStep(_ glyph: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(glyph)
+                .font(Theme.figure(15))
+                .foregroundStyle(enabled ? Theme.subdued : Theme.rule)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     private var canGoForward: Bool {
@@ -92,38 +112,52 @@ struct JournalView: View {
 
     /// The number that replaces a streak: how much of the last 30 days was
     /// kept, per habit. It dips and recovers — it never resets.
+    /// Each habit's reading over the trailing month, set as a table with a
+    /// scale beside the figure so the column can be read down at a glance
+    /// rather than compared number by number.
     @ViewBuilder
     private var consistencyFooter: some View {
         let active = habits.filter { !$0.isArchived }
         if !active.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Last 30 days")
-                    .font(.headline)
-                    .foregroundStyle(Theme.subdued)
+            VStack(alignment: .leading, spacing: 0) {
+                MarginLabel(text: "Last 30 days")
+                    .padding(.bottom, 10)
+
                 ForEach(active) { habit in
-                    let kept = store.keptDays(for: habit)
                     let share = Stats.consistency(
-                        keptDays: kept,
+                        keptDays: store.keptDays(for: habit),
                         window: 30,
                         endingOn: today,
                         startingNoEarlierThan: habit.createdOn
                     ) ?? 0
-                    HStack(spacing: 10) {
-                        Circle()
-                            .fill(Theme.habitColor(habit.colorIndex))
-                            .frame(width: 8, height: 8)
-                        Text(habit.name)
-                            .font(.callout)
-                            .foregroundStyle(Theme.starlight)
-                        Spacer()
-                        Text(share, format: .percent.precision(.fractionLength(0)))
-                            .font(.callout.monospacedDigit())
-                            .foregroundStyle(Theme.subdued)
+
+                    VStack(spacing: 0) {
+                        HStack(spacing: 12) {
+                            Rectangle()
+                                .fill(Theme.habitColor(habit.colorIndex))
+                                .frame(width: 7, height: 7)
+                            Text(habit.name)
+                                .font(.system(size: 15))
+                                .foregroundStyle(Theme.starlight)
+                                .lineLimit(1)
+                            Spacer(minLength: 12)
+                            MeasuredScale(
+                                fraction: share,
+                                tint: Theme.habitColor(habit.colorIndex),
+                                divisions: 4
+                            )
+                            .frame(width: 74)
+                            Text("\(Int((share * 100).rounded()))%")
+                                .font(Theme.figure(13))
+                                .foregroundStyle(Theme.subdued)
+                                .frame(width: 42, alignment: .trailing)
+                        }
+                        .padding(.vertical, 11)
+
+                        Rectangle().fill(Theme.rule).frame(height: Theme.hairline)
                     }
                 }
             }
-            .padding(16)
-            .background(Theme.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
         }
     }
 }
@@ -146,9 +180,10 @@ private struct MonthGrid: View {
         VStack(spacing: 8) {
             HStack {
                 ForEach(weekdaySymbols, id: \.self) { symbol in
-                    Text(symbol)
-                        .font(.caption2)
-                        .foregroundStyle(Theme.subdued)
+                    Text(symbol.uppercased())
+                        .font(Theme.label(9))
+                        .kerning(0.8)
+                        .foregroundStyle(Theme.unlit)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -204,13 +239,15 @@ private struct DayCell: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
                 Text("\(day.day)")
-                    .font(.callout)
-                    .foregroundStyle(isFuture ? Theme.unlit : Theme.starlight)
+                    .font(Theme.figure(13))
+                    .foregroundStyle(isFuture ? Theme.rule : Theme.starlight)
+                // Square marks in a keyed row, matching the chart legend and
+                // the swatches beside each habit's name.
                 HStack(spacing: 2) {
                     ForEach(keptColors.prefix(5), id: \.self) { colorIndex in
-                        Circle()
+                        Rectangle()
                             .fill(Theme.habitColor(colorIndex))
                             .frame(width: 4, height: 4)
                     }
@@ -218,11 +255,15 @@ private struct DayCell: View {
                 .frame(height: 4)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .background {
+            .frame(height: 42)
+            .background(alignment: .bottom) {
+                // Today is marked by a rule beneath rather than a box around —
+                // the same device the week strip and tab bar use.
                 if isToday {
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Theme.subdued, lineWidth: 1)
+                    Rectangle()
+                        .fill(Theme.starlight)
+                        .frame(height: 1.5)
+                        .padding(.horizontal, 9)
                 }
             }
         }
@@ -245,53 +286,44 @@ private struct DaySheet: View {
 
     private var store: HabitStore { HabitStore(context: context) }
 
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(habits.filter { !$0.isArchived }) { habit in
-                    let active = habit.isActive(on: day)
-                    let kept = store.isKept(habit, on: day)
-                    Button {
-                        toggle(habit)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(Theme.habitColor(habit.colorIndex))
-                                .frame(width: 9, height: 9)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(habit.name)
-                                    .font(.body)
-                                    .foregroundStyle(active ? Theme.starlight : Theme.unlit)
-                                if !active {
-                                    Text("Didn't exist yet")
-                                        .font(.caption2)
-                                        .foregroundStyle(Theme.unlit)
-                                }
-                            }
-                            Spacer()
-                            Image(systemName: kept ? "checkmark.circle.fill" : "circle")
-                                .font(.title3)
-                                .foregroundStyle(kept ? Theme.habitColor(habit.colorIndex) : Theme.unlit)
-                        }
-                        .padding(14)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!active)
-                }
+    @Environment(\.dismiss) private var dismiss
 
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
+    var body: some View {
+        AtlasPanel(
+            title: day.date().formatted(.dateTime.weekday(.wide)),
+            provenance: [day.date().formatted(.dateTime.day().month(.abbreviated).year())],
+            trailing: .init(label: "Done", isProminent: true) { dismiss() }
+        ) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(habits.filter { !$0.isArchived }) { habit in
+                        let active = habit.isActive(on: day)
+                        RuledEntry(
+                            swatch: Theme.habitColor(habit.colorIndex),
+                            title: habit.name,
+                            subtitle: active ? nil : "not tracked yet",
+                            isSpent: !active
+                        ) {
+                            Button {
+                                toggle(habit)
+                            } label: {
+                                EntryMark(
+                                    colour: Theme.habitColor(habit.colorIndex),
+                                    isMarked: store.isKept(habit, on: day)
+                                )
+                                .opacity(active ? 1 : 0.35)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!active)
+                        }
+                    }
                 }
-                Spacer()
+                .padding(.horizontal, 20)
+                .padding(.top, 6)
+                .padding(.bottom, 28)
             }
-            .padding(20)
-            .background(Theme.background)
-            .navigationTitle(day.date().formatted(.dateTime.weekday(.wide).month().day()))
-            .navigationBarTitleDisplayMode(.inline)
         }
+        .atlasAlert("Couldn't save that", message: $errorMessage)
     }
 
     private func toggle(_ habit: Habit) {

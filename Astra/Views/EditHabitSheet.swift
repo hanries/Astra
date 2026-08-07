@@ -28,114 +28,121 @@ struct EditHabitSheet: View {
     private var canDelete: Bool { store.canDelete(habit) }
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 26) {
-                field
-                palette
-                Spacer()
-                removal
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+        AtlasPanel(
+            title: "Edit habit",
+            leading: .init(label: "Cancel") { dismiss() },
+            trailing: .init(label: "Save", isProminent: true, isEnabled: !trimmedName.isEmpty, action: save)
+        ) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 30) {
+                    field
+                    palette
+                    removal
                 }
-            }
-            .padding(20)
-            .background(Theme.background)
-            .navigationTitle("Edit habit")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save).disabled(trimmedName.isEmpty)
-                }
-            }
-            .onAppear {
-                name = habit.name
-                colorIndex = habit.colorIndex
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+                .padding(.bottom, 32)
             }
         }
+        .onAppear {
+            name = habit.name
+            colorIndex = habit.colorIndex
+        }
+        .atlasAlert("Couldn't save that", message: $errorMessage)
+        .overlay {
+            if confirmingRemoval {
+                AtlasDialog(
+                    title: canDelete ? "Delete \(habit.name)?" : "Stop tracking \(habit.name)?",
+                    message: canDelete
+                        ? "Nothing is recorded against it, so it goes completely. This can't be undone."
+                        : "Its days stay counted and the stars they lit stay in the sky. You can start it again later.",
+                    confirmLabel: canDelete ? "Delete" : "Stop",
+                    isDestructive: true,
+                    onConfirm: remove
+                ) {
+                    confirmingRemoval = false
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: confirmingRemoval)
     }
 
+    /// A field ruled underneath rather than boxed — the line you write on in a
+    /// logbook, not a control borrowed from a settings screen.
     private var field: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Name")
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(Theme.subdued)
-            TextField("Habit name", text: $name)
+        VStack(alignment: .leading, spacing: 10) {
+            MarginLabel(text: "Name")
+            TextField("", text: $name, prompt: Text("Work out for an hour")
+                .foregroundStyle(Theme.unlit))
                 .textFieldStyle(.plain)
-                .font(.title3)
+                .font(.system(size: 19))
                 .foregroundStyle(Theme.starlight)
-                .padding(14)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+                .tint(Theme.habitColor(colorIndex))
                 .submitLabel(.done)
                 .onSubmit(save)
+                .padding(.bottom, 9)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(Theme.ruleStrong).frame(height: Theme.hairline)
+                }
         }
     }
 
+    /// Squares in a keyed row, as a chart legend sets its symbols — the
+    /// selected one marked by a rule beneath rather than a ring around.
     private var palette: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Colour")
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(Theme.subdued)
-            HStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
+            MarginLabel(text: "Key")
+            HStack(spacing: 0) {
                 ForEach(0..<Theme.habitPalette.count, id: \.self) { index in
                     Button {
                         colorIndex = index
                     } label: {
-                        Circle()
-                            .fill(Theme.habitPalette[index])
-                            .frame(width: 34, height: 34)
-                            .overlay {
-                                if index == colorIndex {
-                                    Circle().stroke(Theme.starlight, lineWidth: 2).padding(-5)
-                                }
-                            }
+                        VStack(spacing: 8) {
+                            Rectangle()
+                                .fill(Theme.habitPalette[index])
+                                .frame(width: 22, height: 22)
+                            Rectangle()
+                                .fill(index == colorIndex ? Theme.starlight : .clear)
+                                .frame(width: 22, height: 2)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Colour \(index + 1)")
+                    .accessibilityAddTraits(index == colorIndex ? [.isSelected] : [])
                 }
             }
         }
     }
 
-    @ViewBuilder
     private var removal: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button(role: .destructive) {
-                confirmingRemoval = true
-            } label: {
-                Label(
-                    canDelete ? "Delete habit" : "Stop tracking",
-                    systemImage: canDelete ? "trash" : "pause.circle"
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
-            }
-            .tint(.red)
+        VStack(alignment: .leading, spacing: 12) {
+            MarginLabel(text: canDelete ? "Delete" : "Stop tracking")
 
             Text(canDelete
                  ? "Nothing has been recorded against this habit yet, so it can go completely."
                  : "Its days stay counted and the stars they lit stay in the sky. It just stops appearing.")
-                .font(.caption)
+                .font(.system(size: 13))
                 .foregroundStyle(Theme.subdued)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-        .confirmationDialog(
-            canDelete ? "Delete \(habit.name)?" : "Stop tracking \(habit.name)?",
-            isPresented: $confirmingRemoval,
-            titleVisibility: .visible
-        ) {
-            Button(canDelete ? "Delete" : "Stop tracking", role: .destructive, action: remove)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(canDelete
-                 ? "This can't be undone."
-                 : "You can start it again later from Manage habits.")
+
+            Button {
+                confirmingRemoval = true
+            } label: {
+                Text(canDelete ? "Delete habit" : "Stop tracking")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color(red: 0.94, green: 0.42, blue: 0.40))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .overlay {
+                        Rectangle()
+                            .strokeBorder(Color(red: 0.94, green: 0.42, blue: 0.40).opacity(0.35),
+                                          lineWidth: Theme.hairline)
+                    }
+            }
+            .buttonStyle(.plain)
         }
     }
 
