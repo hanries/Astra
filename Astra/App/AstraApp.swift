@@ -7,10 +7,20 @@ struct AstraApp: App {
     /// the life of the install. See `SkyProgressionStore`.
     private let progression = SkyProgressionStore.load(catalog: .shared)
 
+    @AppStorage("hasSeenFirstLight") private var hasSeenFirstLight = false
+
     var body: some Scene {
         WindowGroup {
-            RootView(progression: progression)
-                .preferredColorScheme(.dark)
+            Group {
+                if hasSeenFirstLight {
+                    RootView(progression: progression)
+                } else {
+                    OnboardingView(progression: progression) {
+                        withAnimation(.easeInOut(duration: 0.6)) { hasSeenFirstLight = true }
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
         }
         .modelContainer(for: [Habit.self, Completion.self, Award.self])
     }
