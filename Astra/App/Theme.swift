@@ -1,12 +1,28 @@
 import SwiftUI
+import UIKit
 
 /// Astra's visual constants.
 ///
 /// The app is a night sky, so the theme is fixed dark — there is no light mode
-/// to design twice for. Restraint is the aesthetic: near-black, soft starlight
-/// text, and colour reserved for two things only — habit identity and the
-/// stars themselves, whose colours come from their measured B−V index rather
-/// than from taste.
+/// to design twice for.
+///
+/// The grammar is borrowed from real star atlases rather than from "technical
+/// UI" as a mood: Norton's dashed boundaries against solid figure lines, the
+/// printed magnitude key every chart carries, an epoch stamp, ruled logbook
+/// entries, Bečvář's use of colour to encode spectral class. Those conventions
+/// exist because the data demanded them, which is the difference between a
+/// design that looks engineered and one that is.
+///
+/// Two rules follow from that and hold everywhere:
+///
+/// **No invented accent colour.** Every hue on screen is either a habit's
+/// identity, chosen from a fixed palette by the user, or a star's own measured
+/// B−V index. Nothing is tinted for emphasis. A lone acid accent against
+/// near-black is one of the most worn-out looks in software.
+///
+/// **Monospace only where digits align.** Columns of numbers get it because
+/// that is what it is for. Prose, labels and names use the system face, which
+/// on iOS is the honest choice and not a borrowed one.
 enum Theme {
     /// Not pure black: a whisper of blue keeps large fields from reading flat.
     static let background = Color(red: 0.04, green: 0.05, blue: 0.08)
@@ -16,6 +32,31 @@ enum Theme {
     static let subdued = Color(red: 0.55, green: 0.58, blue: 0.66)
     /// Faint outline for stars not yet lit.
     static let unlit = Color(red: 0.25, green: 0.28, blue: 0.36)
+
+    // MARK: - Chart grammar
+
+    /// The ruling of a logbook page. Barely there — a printed rule is thinner
+    /// than any border a UI kit would give you.
+    static let rule = Color(red: 0.16, green: 0.19, blue: 0.25)
+    /// A heavier rule, for the line under a column heading.
+    static let ruleStrong = Color(red: 0.24, green: 0.28, blue: 0.36)
+
+    /// Hairlines are drawn at a true pixel rather than a point, so they stay as
+    /// fine on screen as they are on a printed chart.
+    static var hairline: CGFloat { 1 / UIScreen.main.scale }
+
+    // MARK: - Type
+
+    /// Column headings and chart annotations: small, letterspaced, uppercase.
+    /// The type an engraver would cut into the margin.
+    static func label(_ size: CGFloat = 10) -> Font {
+        .system(size: size, weight: .medium).width(.standard)
+    }
+
+    /// Figures that sit in a column and must line up.
+    static func figure(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .monospaced)
+    }
 
     /// The five habit colours, tuned to read against the dark background.
     /// `Habit.colorIndex` indexes this array — always through `habitColor(_:)`,

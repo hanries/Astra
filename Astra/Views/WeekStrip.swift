@@ -25,7 +25,7 @@ struct WeekStrip: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 0) {
                     ForEach(days, id: \.rawValue) { day in
                         DayChip(
                             day: day,
@@ -40,20 +40,39 @@ struct WeekStrip: View {
                         .id(day.rawValue)
                     }
                 }
-                .padding(.horizontal, 20)
+                // Leading margin only; the trailing gap comes from the spacer
+                // below so today's division can sit clear of the screen edge
+                // when the scale scrolls to its end.
+                .padding(.leading, 20)
+                .padding(.trailing, 12)
+                // The axis the ticks stand on, running the full length of the
+                // scale rather than stopping at the last division.
+                .background(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Theme.rule)
+                        .frame(height: Theme.hairline)
+                }
             }
             .onAppear {
                 // Land on today rather than at the far past end of the strip.
-                proxy.scrollTo(today.rawValue, anchor: .trailing)
+                // Centre-trailing rather than hard trailing, or the final
+                // division sits half off the screen.
+                proxy.scrollTo(today.rawValue, anchor: UnitPoint(x: 0.9, y: 0.5))
             }
             .onChange(of: today.rawValue) { _, newValue in
                 // Midnight crossed while the app was open.
-                proxy.scrollTo(newValue, anchor: .trailing)
+                proxy.scrollTo(newValue, anchor: UnitPoint(x: 0.9, y: 0.5))
             }
         }
     }
 }
 
+/// One division of the scale.
+///
+/// A ticked axis rather than a row of rounded chips: the day sits above its own
+/// tick, kept habits register as marks beneath it, and the selected division is
+/// picked out by a rule rather than by a filled pill. A chart marks a position;
+/// it doesn't put it in a button.
 private struct DayChip: View {
     let day: DayKey
     let isSelected: Bool
@@ -62,52 +81,41 @@ private struct DayChip: View {
     let action: () -> Void
 
     private var weekday: String {
-        day.date().formatted(.dateTime.weekday(.abbreviated))
+        day.date().formatted(.dateTime.weekday(.narrow))
     }
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Text(weekday)
-                    .font(.caption2)
-                    .foregroundStyle(isSelected ? Theme.background.opacity(0.65) : Theme.subdued)
+            VStack(spacing: 6) {
+                Text(weekday.uppercased())
+                    .font(Theme.label(9))
+                    .kerning(0.8)
+                    .foregroundStyle(isSelected ? Theme.starlight : Theme.unlit)
 
                 Text("\(day.day)")
-                    .font(.system(size: 17, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(isSelected ? Theme.background : Theme.starlight)
+                    .font(Theme.figure(16, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Theme.starlight : Theme.subdued)
 
-                // Kept-habit dots, or a placeholder so chips don't change
-                // height between days with and without history.
-                HStack(spacing: 3) {
-                    if keptColors.isEmpty {
-                        Circle()
-                            .fill(.clear)
+                // Marks for what was kept, held at a fixed height so divisions
+                // stay evenly spaced whether or not a day has history.
+                HStack(spacing: 2.5) {
+                    ForEach(Array(keptColors.prefix(5).enumerated()), id: \.offset) { _, index in
+                        Rectangle()
+                            .fill(Theme.habitColor(index))
                             .frame(width: 4, height: 4)
-                    } else {
-                        ForEach(Array(keptColors.prefix(5).enumerated()), id: \.offset) { _, index in
-                            Circle()
-                                .fill(Theme.habitColor(index))
-                                .frame(width: 4, height: 4)
-                                .opacity(isSelected ? 0.9 : 1)
-                        }
                     }
                 }
                 .frame(height: 4)
+
+                // The tick. Selected day gets a full-height major tick; today
+                // keeps a shorter one so there's always a way back to now.
+                Rectangle()
+                    .fill(isSelected ? Theme.starlight : (isToday ? Theme.subdued : Theme.rule))
+                    .frame(width: isSelected ? 1.5 : Theme.hairline, height: isSelected ? 9 : (isToday ? 6 : 3))
+                    .frame(height: 9, alignment: .top)
             }
-            .frame(width: 46)
-            .padding(.vertical, 12)
-            .background {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Theme.starlight : Theme.surface)
-                    .overlay {
-                        // Today keeps a ring when you've navigated away from it,
-                        // so there's always a way back to now.
-                        if isToday && !isSelected {
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Theme.subdued.opacity(0.6), lineWidth: 1)
-                        }
-                    }
-            }
+            .frame(width: 40)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(day.date().formatted(.dateTime.weekday(.wide).month().day()))

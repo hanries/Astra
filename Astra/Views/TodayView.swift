@@ -51,27 +51,49 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 24) {
                     WeekStrip(today: today, selection: $selectedDay) { day in
                         keptColorIndexes(on: day)
                     }
                     .padding(.horizontal, -20)
 
-                    VStack(alignment: .leading, spacing: 26) {
+                    VStack(alignment: .leading, spacing: 24) {
                         progressHeader
                         if activeHabits.isEmpty {
                             emptyState
                         } else {
-                            section(title: "To do", habits: pending, isDone: false)
-                            section(title: "Done", habits: done, isDone: true)
+                            section(title: "To keep", habits: pending, isDone: false)
+                            section(title: "Kept", habits: done, isDone: true)
                         }
                     }
                     .animation(.spring(response: 0.45, dampingFraction: 0.78), value: done.map(\.id))
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+                .padding(.bottom, 28)
             }
             .background(Theme.background)
-            .navigationTitle(navigationTitle)
+            // The system's large title is the single most recognisable piece of
+            // stock iOS on the screen. The date belongs in the app's own
+            // grammar — set as a chart heading, with the full date beneath it
+            // the way a plate carries its observation date.
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text(isViewingToday ? "TODAY" : selectedDay.date()
+                            .formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                            .font(Theme.label(11))
+                            .kerning(1.8)
+                            .foregroundStyle(Theme.starlight)
+                        Text(selectedDay.date().formatted(.dateTime.day().month(.abbreviated).year()))
+                            .font(Theme.figure(9))
+                            .kerning(0.5)
+                            .foregroundStyle(Theme.unlit)
+                    }
+                }
+            }
             .toolbar {
                 #if DEBUG
                 ToolbarItem(placement: .topBarLeading) {
@@ -154,31 +176,40 @@ struct TodayView: View {
             .sorted()
     }
 
+    /// The day's reading, set as a chart figure: the count large and
+    /// monospaced, the denominator small beside it, a measured scale beneath.
     private var progressHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text("\(done.count)")
-                    .font(.system(size: 40, weight: .semibold).monospacedDigit())
+                    .font(Theme.figure(44, weight: .light))
                     .foregroundStyle(Theme.starlight)
                     .contentTransition(.numericText())
-                Text("of \(activeHabits.count) kept\(isViewingToday ? " today" : "")")
-                    .font(.callout)
+                Text("/\(activeHabits.count)")
+                    .font(Theme.figure(20, weight: .light))
+                    .foregroundStyle(Theme.unlit)
+                Spacer()
+                Text(isViewingToday ? "KEPT TODAY" : "KEPT")
+                    .font(Theme.label(10))
+                    .kerning(1.4)
                     .foregroundStyle(Theme.subdued)
+                    .offset(y: -4)
             }
 
             if !activeHabits.isEmpty {
-                ProgressBar(
+                MeasuredScale(
                     fraction: Double(done.count) / Double(activeHabits.count),
                     tint: done.count == activeHabits.count
                         ? Theme.starlight
-                        : Theme.habitColor(pending.first?.colorIndex ?? 0)
+                        : Theme.habitColor(pending.first?.colorIndex ?? 0),
+                    divisions: max(2, activeHabits.count)
                 )
-                .frame(height: 6)
             }
 
             Text(statusLine)
-                .font(.footnote)
+                .font(.system(size: 13))
                 .foregroundStyle(Theme.subdued)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -227,28 +258,19 @@ struct TodayView: View {
     @ViewBuilder
     private func section(title: String, habits: [Habit], isDone: Bool) -> some View {
         if !habits.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 6) {
-                    Text(title)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Theme.subdued)
-                    Text("\(habits.count)")
-                        .font(.caption2.weight(.medium).monospacedDigit())
-                        .foregroundStyle(Theme.subdued.opacity(0.7))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Theme.surface, in: Capsule())
-                }
+            VStack(alignment: .leading, spacing: 0) {
+                MarginLabel(text: title, count: habits.count)
+                    .padding(.bottom, 4)
 
                 ForEach(habits) { habit in
-                    HabitCard(
+                    HabitEntry(
                         habit: habit,
                         isDone: isDone,
                         consistency: consistency(for: habit),
                         onToggle: { toggle(habit) },
                         onOpenHistory: { historyHabit = habit }
                     )
-                    // Keyed by habit, so a card animates between the two
+                    // Keyed by habit, so an entry travels between the two
                     // sections rather than one vanishing and another appearing.
                     .matchedGeometryEffect(id: habit.id, in: cardTransition)
                 }
@@ -303,14 +325,13 @@ struct TodayView: View {
 
 // MARK: - Card
 
-/// One habit, with two targets.
+/// One habit, as a logbook entry with two targets.
 ///
-/// The card body opens the habit's history and the checkmark logs the day.
-/// They're different intents — one is the daily action, the other is looking
-/// back — and sharing a tap would mean guessing which was meant. The circle is
-/// sized to 44pt so the daily one stays comfortably hittable despite being the
-/// smaller of the two.
-private struct HabitCard: View {
+/// The entry body opens the habit's record and the mark logs the day. They're
+/// different intents — one is the daily action, the other is looking back — and
+/// sharing a tap would mean guessing which was meant. The mark carries a 44pt
+/// target despite reading as 22.
+private struct HabitEntry: View {
     let habit: Habit
     let isDone: Bool
     let consistency: Double?
@@ -319,90 +340,30 @@ private struct HabitCard: View {
 
     private var tint: Color { Theme.habitColor(habit.colorIndex) }
 
+    /// Set as a figure with its unit, the way a reading is quoted — not as a
+    /// sentence, which at this size is just a long grey smear.
+    private var reading: String? {
+        guard let consistency else { return nil }
+        return "\(Int((consistency * 100).rounded()))% · 30d"
+    }
+
     var body: some View {
-        HStack(spacing: 14) {
-            Button(action: onOpenHistory) {
-                HStack(spacing: 14) {
-                    // The colour bar carries habit identity down the whole card
-                    // rather than sitting in a dot you have to look for.
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(tint.opacity(isDone ? 0.45 : 1))
-                        .frame(width: 4)
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(habit.name)
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(isDone ? Theme.subdued : Theme.starlight)
-                            .strikethrough(isDone, color: Theme.subdued.opacity(0.6))
-                            .multilineTextAlignment(.leading)
-
-                        if let consistency {
-                            Text("\(consistency.formatted(.percent.precision(.fractionLength(0)))) of the last 30 days")
-                                .font(.caption)
-                                .foregroundStyle(Theme.subdued.opacity(isDone ? 0.6 : 0.9))
-                        }
-                    }
-                    Spacer(minLength: 4)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PressableCardStyle())
-            .accessibilityLabel(habit.name)
-            .accessibilityHint("Double tap to see this habit's history")
-
+        RuledEntry(
+            swatch: tint,
+            title: habit.name,
+            subtitle: reading,
+            isSpent: isDone
+        ) {
             Button(action: onToggle) {
-                ZStack {
-                    Circle()
-                        .stroke(isDone ? tint : Theme.unlit, lineWidth: 1.5)
-                        .frame(width: 28, height: 28)
-                    if isDone {
-                        Circle().fill(tint).frame(width: 28, height: 28)
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Theme.background)
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                EntryMark(colour: tint, isMarked: isDone)
             }
-            .buttonStyle(PressableCardStyle())
+            .buttonStyle(.plain)
             .accessibilityLabel("\(habit.name), \(isDone ? "kept" : "not kept")")
             .accessibilityHint(isDone ? "Double tap to unmark" : "Double tap to mark kept")
         }
-        .padding(.vertical, 14)
-        .padding(.trailing, 12)
-        .padding(.leading, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Theme.surface.opacity(isDone ? 0.45 : 1))
-        )
-    }
-}
-
-/// A card that gives under the finger. The only motion in the list that isn't
-/// the completion itself.
-private struct PressableCardStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.975 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
-    }
-}
-
-private struct ProgressBar: View {
-    let fraction: Double
-    let tint: Color
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Theme.surface)
-                Capsule()
-                    .fill(tint)
-                    .frame(width: max(0, min(1, fraction)) * geometry.size.width)
-            }
-        }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: fraction)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onOpenHistory)
+        .accessibilityElement(children: .contain)
     }
 }
 
