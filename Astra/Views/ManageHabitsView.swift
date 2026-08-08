@@ -80,7 +80,10 @@ struct ManageHabitsView: View {
         RuledEntry(
             swatch: Theme.habitColor(habit.colorIndex),
             title: habit.name,
-            subtitle: "^[\(habit.completions.count) day](inflect: true) recorded"
+            // Pluralised by hand. The `^[...](inflect:)` markup only resolves
+            // through a LocalizedStringKey, and this arrives as a plain String,
+            // so the markup was rendering on screen verbatim.
+            subtitle: "\(habit.completions.count) day\(habit.completions.count == 1 ? "" : "s") recorded"
         ) {
             EmptyView()
         }

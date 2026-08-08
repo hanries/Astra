@@ -19,6 +19,10 @@ struct TodayView: View {
     @State private var showingAddHabit = false
     @State private var showingManageHabits = false
     @State private var showingMenu = false
+    @State private var showingReminders = false
+    /// Shown once, after the first star is earned. Asking before anything has
+    /// been earned is a toll gate; asking here is an offer.
+    @State private var offeringReminders = false
     @State private var errorMessage: String?
     @State private var keptPulse = 0
     @State private var celebration: Celebration?
@@ -143,6 +147,12 @@ struct TodayView: View {
             .atlasSheet(item: $historyHabit) { habit in
                 HabitHistoryView(habit: habit)
             }
+            .atlasSheet(isPresented: $showingReminders) {
+                RemindersView(
+                    nextStarName: nextStarName,
+                    isTodayComplete: isTodayComplete
+                )
+            }
             .atlasAlert("Couldn't do that", message: $errorMessage)
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: keptPulse)
@@ -157,11 +167,32 @@ struct TodayView: View {
                         label: "Manage habits",
                         isEnabled: !habits.isEmpty
                     ) { showingManageHabits = true },
+                    .init(label: "Reminders") { showingReminders = true },
                 ]) {
                     showingMenu = false
                 }
             }
         }
+        .overlay {
+            if offeringReminders {
+                AtlasDialog(
+                    title: "A nudge each evening?",
+                    message: "Astra can name the star waiting for you, once a day, at a time you choose. Nothing arrives on a day you've already finished.",
+                    confirmLabel: "Set one up",
+                    onConfirm: {
+                        offeringReminders = false
+                        showingReminders = true
+                    }
+                ) {
+                    offeringReminders = false
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: offeringReminders)
+        // Keeps the pending week honest: content and the skip-if-done rule are
+        // both recomputed whenever the day's state changes or the app returns.
+        .task(id: "\(awards.count)-\(done.count)") { await refreshReminders() }
         .overlay {
             if let celebration {
                 StarUnlockView(
@@ -172,6 +203,7 @@ struct TodayView: View {
                     let star = celebration.star
                     self.celebration = nil
                     onStarLit(star)
+                    Task { await offerRemindersIfDue() }
                 }
                 .transition(.opacity)
             }
@@ -329,6 +361,36 @@ struct TodayView: View {
             constellation: hit.constellation,
             litCount: litInFigure
         )
+    }
+
+    // MARK: - Reminders
+
+    /// The star a reminder would name: whichever one is next to light.
+    private var nextStarName: String? {
+        progression.star(forOrdinal: awards.count)?.star.displayName
+    }
+
+    private var isTodayComplete: Bool {
+        !activeHabits.isEmpty && pending.isEmpty && isViewingToday
+    }
+
+    private func refreshReminders() async {
+        await ReminderService.shared.refresh(
+            nextStarName: nextStarName,
+            isTodayComplete: isTodayComplete
+        )
+    }
+
+    /// Offers reminders once, just after the first star.
+    private func offerRemindersIfDue() async {
+        let reminders = ReminderService.shared
+        guard !reminders.hasBeenOffered, awards.count >= 1 else { return }
+        guard await reminders.authorizationStatus() == .notDetermined else {
+            reminders.hasBeenOffered = true
+            return
+        }
+        reminders.hasBeenOffered = true
+        offeringReminders = true
     }
 
     private func act(_ work: () throws -> Void) {
