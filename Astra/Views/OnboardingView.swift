@@ -53,20 +53,24 @@ struct OnboardingView: View {
         case dusk, sun, oneStar, figures, naming
     }
 
-    /// The star this user actually lights first.
-    private var firstStar: (constellation: Constellation, star: Star)? {
-        progression.star(forOrdinal: 0)
-    }
-
     /// The figure used to demonstrate a constellation completing.
     ///
-    /// Their own first constellation where it has enough stars to look like a
-    /// shape — a two-star figure drawing one line teaches nothing. Falls back to
-    /// the earliest in their progression that does, so it stays a figure they
-    /// will genuinely fill rather than a stock example.
+    /// The earliest in their own progression with enough stars to read as a
+    /// shape, since a two-star figure drawing one line teaches nothing. Still a
+    /// figure they will genuinely fill, not a stock example.
     private var demonstrationFigure: Constellation? {
         progression.constellations.first { $0.starCount >= 4 }
             ?? progression.constellations.first
+    }
+
+    /// The star shown lighting, and the one that then flies into place.
+    ///
+    /// Taken from the demonstration figure rather than from the head of the
+    /// progression, because the next page moves this exact star into that
+    /// exact figure. A star that didn't belong to the figure would make the
+    /// journey a lie.
+    private var heroStar: Star? {
+        demonstrationFigure?.stars.first
     }
 
     var body: some View {
@@ -148,10 +152,9 @@ struct OnboardingView: View {
     private var sunContent: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                Spacer().frame(height: geometry.size.height * 0.44)
+                Spacer().frame(height: geometry.size.height * 0.46)
                 PhaseCopy(
-                    headline: "This is our Sun, and where your universe begins.",
-                    detail: "Your sky fills outward from here. Astra works out roughly where you're standing from your time zone, so it never has to ask where you live.",
+                    "This is our Sun, and where your universe begins.",
                     alignment: .center
                 )
                 .shielded()
@@ -164,25 +167,23 @@ struct OnboardingView: View {
 
     // MARK: - One star
 
-    /// The star takes the middle and the words sit right at the bottom edge,
-    /// small. Nothing competes with the thing catching light.
+    /// The star takes the middle and one line sits at the bottom. Nothing
+    /// competes with the thing catching light.
+    ///
+    /// Held at `heroHeight` from the top so the next page can start this same
+    /// star in the same place and the two read as one continuous shot.
     private var oneStarContent: some View {
         VStack(spacing: 0) {
-            Spacer()
-            if let firstStar {
-                Ignition(star: firstStar.star)
-                    .frame(height: 230)
-                Text(firstStar.star.displayName)
+            if let heroStar {
+                Ignition(star: heroStar)
+                    .frame(height: Self.heroHeight)
+                Text(heroStar.displayName)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Theme.starlight)
             }
             Spacer()
             PhaseCopy(
-                headline: "Keep them all for a day and one star lights.",
-                // The forgiveness rule belongs here, where the mechanic is
-                // introduced, rather than being discovered on the first bad
-                // day. It's also the line that separates this from a streak.
-                detail: "One a day at most. Miss a day and you still keep every star you've already lit.",
+                "Complete your tasks to unlock a new star every day.",
                 alignment: .center
             )
             TapHint(opacity: 1)
@@ -190,52 +191,32 @@ struct OnboardingView: View {
         .transition(.opacity)
     }
 
+    /// Vertical space the hero occupies on both the star page and the figure
+    /// page, so it doesn't jump between them.
+    static let heroHeight: CGFloat = 380
+
     // MARK: - Figures
 
-    /// The figure held high and off to one side, its name labelled against it
-    /// rather than titled beneath it, with the words in the opposite corner.
-    /// A diagonal, so this page doesn't sit where the last one sat.
+    /// The star from the previous page travels into its own place in the
+    /// figure, and the rest of the constellation assembles around it.
     private var figuresContent: some View {
-        GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 0) {
-                if let demonstrationFigure {
-                    HStack(alignment: .top, spacing: 0) {
-                        Spacer(minLength: 0)
-                        VStack(alignment: .trailing, spacing: 8) {
-                            FigureDraw(constellation: demonstrationFigure)
-                                .frame(height: geometry.size.height * 0.30)
-                            Text(demonstrationFigure.name.uppercased())
-                                .font(Theme.label(10))
-                                .kerning(1.5)
-                                .foregroundStyle(Theme.subdued)
-                                .padding(.trailing, 6)
-                        }
-                        .frame(width: geometry.size.width * 0.82)
-                    }
-                    .padding(.top, geometry.size.height * 0.10)
-                }
-                Spacer()
-                PhaseCopy(
-                    headline: "Stars join into figures.",
-                    detail: figurePacingLine,
-                    alignment: .leading
-                )
-                TapHint(opacity: 1)
+        VStack(spacing: 0) {
+            if let demonstrationFigure, let heroStar {
+                FigureDraw(constellation: demonstrationFigure, hero: heroStar)
+                    .frame(height: Self.heroHeight)
+                Text(demonstrationFigure.name.uppercased())
+                    .font(Theme.label(10))
+                    .kerning(1.5)
+                    .foregroundStyle(Theme.subdued)
             }
+            Spacer()
+            PhaseCopy(
+                "Stars join into constellations.",
+                alignment: .center
+            )
+            TapHint(opacity: 1)
         }
         .transition(.opacity)
-    }
-
-    /// Pacing given in days, taken from the real figures in this user's own
-    /// order. Numbers they can check later beat an adjective.
-    private var figurePacingLine: String {
-        let ordered = progression.constellations
-        guard let smallest = ordered.first,
-              let largest = ordered.last else {
-            return "The small ones come first and the long ones come later."
-        }
-        return "\(smallest.name) takes \(smallest.starCount) days and "
-            + "\(largest.name) takes \(largest.starCount), so the small ones come first."
     }
 
     // MARK: - Naming
@@ -284,10 +265,6 @@ struct OnboardingView: View {
                 }
                 .padding(.top, 6)
             }
-
-            Text("You can add up to five once you're in.")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.unlit)
 
             Spacer()
 
@@ -526,33 +503,30 @@ private struct TapHint: View {
 /// heading was the flow's own worst habit — it dressed four plain statements up
 /// as sections of a document, which is the register the copy is trying to
 /// avoid in the first place.
+/// A phase's one line.
+///
+/// There used to be a second, smaller line under each of these. It was cut:
+/// with the animation carrying the explanation, the small print was reading as
+/// caption furniture rather than as anything anyone needed.
 private struct PhaseCopy: View {
     let headline: String
-    let detail: String
     var alignment: HorizontalAlignment = .leading
 
-    private var textAlignment: TextAlignment {
-        alignment == .center ? .center : .leading
+    init(_ headline: String, alignment: HorizontalAlignment = .leading) {
+        self.headline = headline
+        self.alignment = alignment
     }
 
     var body: some View {
-        VStack(alignment: alignment, spacing: 14) {
-            Text(headline)
-                .font(.system(size: 23, weight: .regular))
-                .foregroundStyle(Theme.starlight)
-                .multilineTextAlignment(textAlignment)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(detail)
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.subdued)
-                .lineSpacing(3)
-                .multilineTextAlignment(textAlignment)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(
-            maxWidth: .infinity,
-            alignment: alignment == .center ? .center : .leading
-        )
+        Text(headline)
+            .font(.system(size: 23, weight: .regular))
+            .foregroundStyle(Theme.starlight)
+            .multilineTextAlignment(alignment == .center ? .center : .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(
+                maxWidth: .infinity,
+                alignment: alignment == .center ? .center : .leading
+            )
     }
 }
 
@@ -584,7 +558,15 @@ private extension View {
 /// fading in. This is the app's actual figure data, not a diagram.
 private struct FigureDraw: View {
     let constellation: Constellation
+    /// The star carried over from the previous page. It begins where that page
+    /// left it, then travels to the place it actually occupies in the figure.
+    let hero: Star
 
+    /// Hero travelling from centre-large to its own position at true size.
+    @State private var arrived: CGFloat = 0
+    /// The rest of the figure's stars fading up once the hero has landed.
+    @State private var others: CGFloat = 0
+    /// Lines joining them, drawn in the order the figure is written.
     @State private var drawn: CGFloat = 0
 
     private var catalog: StarCatalog { .shared }
@@ -600,8 +582,12 @@ private struct FigureDraw: View {
     var body: some View {
         GeometryReader { geometry in
             let layout = FigureLayout(size: geometry.size, stars: constellation.stars)
+            let centre = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            let landing = layout.point(hero)
+            let heroRadius = Theme.starRadius(magnitude: hero.magnitude)
+
             ZStack {
-                // Lines first so stars sit on top of their own joins.
+                // Lines under the stars, so a join never covers the thing it joins.
                 ForEach(Array(edges.enumerated()), id: \.offset) { index, edge in
                     let share = 1.0 / Double(max(edges.count, 1))
                     let start = Double(index) * share
@@ -615,19 +601,57 @@ private struct FigureDraw: View {
                     .stroke(Theme.starlight.opacity(0.45), lineWidth: 1)
                 }
 
-                ForEach(constellation.stars) { star in
-                    let radius = Theme.starRadius(magnitude: star.magnitude)
-                    Circle()
-                        .fill(Theme.starColor(bv: star.colorIndex))
-                        .frame(width: radius * 2, height: radius * 2)
-                        .shadow(color: Theme.starColor(bv: star.colorIndex).opacity(0.7), radius: radius * 1.4)
-                        .position(layout.point(star))
+                ForEach(constellation.stars.filter { $0.hr != hero.hr }) { star in
+                    dot(star, at: layout.point(star))
+                        .opacity(Double(others))
                 }
+
+                // The hero starts as the same portrait the previous page ended
+                // on, so the crossfade between pages has nothing to catch on,
+                // then hands over to a plain dot as it lands. Without the
+                // handover it stays textured at rest and reads as a different
+                // kind of object from the stars beside it.
+                ZStack {
+                    StarPortrait(star: hero, diameter: heroDiameter(finalRadius: heroRadius),
+                                 showsCorona: arrived < 0.5, isAnimated: false)
+                        .opacity(1 - settledIn)
+                    dot(hero, at: .zero)
+                        .frame(width: heroRadius * 2, height: heroRadius * 2)
+                        .opacity(settledIn)
+                }
+                .position(
+                    x: centre.x + (landing.x - centre.x) * arrived,
+                    y: centre.y + (landing.y - centre.y) * arrived
+                )
             }
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.8).delay(0.35)) { drawn = 1 }
+            withAnimation(.easeInOut(duration: 1.15).delay(0.45)) { arrived = 1 }
+            withAnimation(.easeOut(duration: 0.7).delay(1.5)) { others = 1 }
+            withAnimation(.easeInOut(duration: 1.6).delay(1.9)) { drawn = 1 }
         }
+    }
+
+    /// Shrinks from the size the star page showed to the size its own
+    /// magnitude earns it.
+    private func heroDiameter(finalRadius: Double) -> CGFloat {
+        let start: CGFloat = 150
+        let end = max(finalRadius * 2, 5)
+        return start + (end - start) * arrived
+    }
+
+    /// Handover from portrait to dot, over the last stretch of the journey.
+    private var settledIn: Double {
+        max(0, min(1, (Double(arrived) - 0.72) / 0.28))
+    }
+
+    private func dot(_ star: Star, at point: CGPoint) -> some View {
+        let radius = Theme.starRadius(magnitude: star.magnitude)
+        return Circle()
+            .fill(Theme.starColor(bv: star.colorIndex))
+            .frame(width: radius * 2, height: radius * 2)
+            .shadow(color: Theme.starColor(bv: star.colorIndex).opacity(0.7), radius: radius * 1.4)
+            .position(point)
     }
 }
 
