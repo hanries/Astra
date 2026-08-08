@@ -44,12 +44,23 @@ struct OnboardingView: View {
     @FocusState private var isNaming: Bool
 
     enum Phase: Int, CaseIterable {
-        case dusk, anchor, naming, firstLight
+        case dusk, sun, oneStar, figures, naming
     }
 
-    /// The star waiting at the end — the one this user actually lights first.
+    /// The star this user actually lights first.
     private var firstStar: (constellation: Constellation, star: Star)? {
         progression.star(forOrdinal: 0)
+    }
+
+    /// The figure used to demonstrate a constellation completing.
+    ///
+    /// Their own first constellation where it has enough stars to look like a
+    /// shape — a two-star figure drawing one line teaches nothing. Falls back to
+    /// the earliest in their progression that does, so it stays a figure they
+    /// will genuinely fill rather than a stock example.
+    private var demonstrationFigure: Constellation? {
+        progression.constellations.first { $0.starCount >= 4 }
+            ?? progression.constellations.first
     }
 
     var body: some View {
@@ -60,8 +71,8 @@ struct OnboardingView: View {
                 stars: duskStars,
                 startedAt: startedAt,
                 settled: phase != .dusk,
-                dimmed: phase == .naming || phase == .firstLight,
-                showsSun: phase == .anchor
+                dimmed: phase != .dusk && phase != .sun,
+                showsSun: phase == .sun
             )
             .ignoresSafeArea()
 
@@ -90,10 +101,11 @@ struct OnboardingView: View {
     @ViewBuilder
     private var content: some View {
         switch phase {
-        case .dusk:       duskContent
-        case .anchor:     anchorContent
-        case .naming:     namingContent
-        case .firstLight: firstLightContent
+        case .dusk:    duskContent
+        case .sun:     sunContent
+        case .oneStar: oneStarContent
+        case .figures: figuresContent
+        case .naming:  namingContent
         }
     }
 
@@ -122,13 +134,14 @@ struct OnboardingView: View {
 
     // MARK: - Anchor
 
-    private var anchorContent: some View {
+    // MARK: - Sun
+
+    private var sunContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer()
             PhaseCopy(
-                label: "Your anchor",
-                headline: "Everything unlocks outward from here.",
-                detail: firstConstellationLine
+                headline: "This is our Sun, and where your universe begins.",
+                detail: "Your sky fills outward from here. Its position comes from your time zone — Astra never asks where you live."
             )
             .padding(.bottom, 8)
             TapHint(opacity: 1)
@@ -136,10 +149,68 @@ struct OnboardingView: View {
         .transition(.opacity)
     }
 
-    private var firstConstellationLine: String {
-        let place = "Position comes from your time zone. Astra never asks where you live."
-        guard let name = progression.constellations.first?.name else { return place }
-        return "\(place)\n\nThe first figure you'll fill is \(name)."
+    // MARK: - One star
+
+    private var oneStarContent: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            if let firstStar {
+                Ignition(star: firstStar.star)
+                    .frame(height: 200)
+                Text(firstStar.star.displayName)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Theme.starlight)
+                    .padding(.top, 4)
+            }
+            Spacer()
+            PhaseCopy(
+                headline: "Keep everything you set out to, and a star lights.",
+                // The forgiveness rule belongs here, at the moment the mechanic
+                // is introduced, rather than being discovered on the first bad
+                // day. It's also the sentence that separates this from a streak.
+                detail: "One a day, at most. Miss one and nothing is taken back — you simply don't light one that night."
+            )
+            .padding(.bottom, 8)
+            TapHint(opacity: 1)
+        }
+        .transition(.opacity)
+    }
+
+    // MARK: - Figures
+
+    private var figuresContent: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            if let demonstrationFigure {
+                FigureDraw(constellation: demonstrationFigure)
+                    .frame(height: 200)
+                Text(demonstrationFigure.name)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Theme.starlight)
+                    .padding(.top, 10)
+            }
+            Spacer()
+            PhaseCopy(
+                headline: "Stars join into figures.",
+                detail: figurePacingLine
+            )
+            .padding(.bottom, 8)
+            TapHint(opacity: 1)
+        }
+        .transition(.opacity)
+    }
+
+    /// Pacing stated in days, from the real figures in this user's own order —
+    /// concrete beats an adjective, and these are numbers they can check later.
+    private var figurePacingLine: String {
+        let ordered = progression.constellations
+        guard let smallest = ordered.first,
+              let largest = ordered.last else {
+            return "Small figures come first, larger ones later."
+        }
+        return "\(smallest.name) takes \(smallest.starCount) days. "
+            + "\(largest.name) takes \(largest.starCount). "
+            + "The small ones come first."
     }
 
     // MARK: - Naming
@@ -148,7 +219,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 30) {
             Spacer()
 
-            Text("What do you want to keep?")
+            Text("Name one habit you want to keep track of.")
                 .font(.system(size: 23, weight: .regular))
                 .foregroundStyle(Theme.starlight)
                 .fixedSize(horizontal: false, vertical: true)
@@ -196,7 +267,7 @@ struct OnboardingView: View {
             Spacer()
 
             if !trimmedName.isEmpty {
-                TapHint(opacity: 1, text: "Tap to continue")
+                TapHint(opacity: 1, text: "Tap to begin")
                     .transition(.opacity)
             }
         }
@@ -210,46 +281,6 @@ struct OnboardingView: View {
 
     // MARK: - First light
 
-    private var firstLightContent: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            if let firstStar {
-                Ignition(star: firstStar.star)
-                    .frame(height: 210)
-
-                VStack(spacing: 5) {
-                    Text(firstStar.star.displayName)
-                        .font(.system(size: 25, weight: .medium))
-                        .foregroundStyle(Theme.starlight)
-                    ProvenanceStamp(parts: [
-                        firstStar.constellation.name,
-                        "HR \(firstStar.star.hr)",
-                    ])
-                }
-                .padding(.top, 6)
-
-                // The habit stands on its own line rather than being dropped
-                // into a sentence — "Keep Work out for an hour today" puts a
-                // capital in the middle of a clause and reads as a mistake.
-                VStack(spacing: 7) {
-                    Text(trimmedName)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Theme.habitColor(colorIndex))
-                    Text("Keep it today and this lights.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.subdued)
-                }
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 26)
-                .padding(.horizontal, 8)
-            }
-            Spacer()
-            TapHint(opacity: 1, text: "Tap to begin")
-        }
-        .transition(.opacity)
-    }
-
     // MARK: - Flow
 
     private func advanceByTap() {
@@ -258,14 +289,16 @@ struct OnboardingView: View {
             // Ignore taps until the field has actually come out; tapping
             // through the opening would skip the only thing it's there to show.
             guard Date.now.timeIntervalSince(startedAt) > DuskField.titleAt else { return }
-            move(to: .anchor)
-        case .anchor:
+            move(to: .sun)
+        case .sun:
+            move(to: .oneStar)
+        case .oneStar:
+            move(to: .figures)
+        case .figures:
             move(to: .naming)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { isNaming = true }
         case .naming:
             commitHabit()
-        case .firstLight:
-            onFinish()
         }
     }
 
@@ -278,7 +311,7 @@ struct OnboardingView: View {
         isNaming = false
         do {
             try HabitStore(context: context).addHabit(name: trimmedName, colorIndex: colorIndex)
-            move(to: .firstLight)
+            onFinish()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -450,6 +483,9 @@ private struct TapHint: View {
             .kerning(1.6)
             .foregroundStyle(Theme.subdued)
             .opacity(opacity * (breathing ? 0.45 : 1))
+            // Clear of the copy above it — sitting tight under a paragraph made
+            // the hint read as a third line of that paragraph.
+            .padding(.top, 30)
             .padding(.bottom, 34)
             .onAppear {
                 withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
@@ -459,16 +495,18 @@ private struct TapHint: View {
     }
 }
 
-/// A phase's words: a margin label, one line that carries the idea, and the
-/// small print beneath it.
+/// A phase's words: one line carrying the idea, and the small print beneath.
+///
+/// No margin label above it. Every phase having a little uppercase category
+/// heading was the flow's own worst habit — it dressed four plain statements up
+/// as sections of a document, which is the register the copy is trying to
+/// avoid in the first place.
 private struct PhaseCopy: View {
-    let label: String
     let headline: String
     let detail: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            MarginLabel(text: label)
+        VStack(alignment: .leading, spacing: 14) {
             Text(headline)
                 .font(.system(size: 23, weight: .regular))
                 .foregroundStyle(Theme.starlight)
@@ -479,5 +517,107 @@ private struct PhaseCopy: View {
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A constellation assembling: its stars already lit, then its lines drawn on.
+///
+/// The lines are drawn with a trim, edge by edge, in the order the figure is
+/// written — so it reads as something being joined up rather than a shape
+/// fading in. This is the app's actual figure data, not a diagram.
+private struct FigureDraw: View {
+    let constellation: Constellation
+
+    @State private var drawn: CGFloat = 0
+
+    private var catalog: StarCatalog { .shared }
+
+    /// Figure edges resolved to the two stars they join.
+    private var edges: [(Star, Star)] {
+        (catalog.figures[constellation.abbreviation] ?? []).compactMap { edge in
+            guard let a = catalog.star(hr: edge.0), let b = catalog.star(hr: edge.1) else { return nil }
+            return (a, b)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let layout = FigureLayout(size: geometry.size, stars: constellation.stars)
+            ZStack {
+                // Lines first so stars sit on top of their own joins.
+                ForEach(Array(edges.enumerated()), id: \.offset) { index, edge in
+                    let share = 1.0 / Double(max(edges.count, 1))
+                    let start = Double(index) * share
+                    let local = max(0, min(1, (Double(drawn) - start) / share))
+
+                    Path { path in
+                        path.move(to: layout.point(edge.0))
+                        path.addLine(to: layout.point(edge.1))
+                    }
+                    .trim(from: 0, to: local)
+                    .stroke(Theme.starlight.opacity(0.45), lineWidth: 1)
+                }
+
+                ForEach(constellation.stars) { star in
+                    let radius = Theme.starRadius(magnitude: star.magnitude)
+                    Circle()
+                        .fill(Theme.starColor(bv: star.colorIndex))
+                        .frame(width: radius * 2, height: radius * 2)
+                        .shadow(color: Theme.starColor(bv: star.colorIndex).opacity(0.7), radius: radius * 1.4)
+                        .position(layout.point(star))
+                }
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.8).delay(0.35)) { drawn = 1 }
+        }
+    }
+}
+
+/// Fits a constellation's own stars to a box, keeping their real shape.
+///
+/// Everything is computed once in `init`. The first version recomputed the
+/// projection inside `point(_:)`, which ran the whole catalogue lookup per star
+/// per frame, and centred on the star centroid rather than the figure's
+/// bounding box — so any lopsided figure, which is most of them, sat off to one
+/// side of its own frame.
+private struct FigureLayout {
+    private let placed: [Int: CGPoint]
+
+    init(size: CGSize, stars: [Star]) {
+        let origin = Constellation(abbreviation: "", name: "", stars: stars).center
+        let projected = stars.map { ($0.hr, SkyMath.project($0.coordinate, from: origin)) }
+
+        guard let first = projected.first else {
+            placed = [:]
+            return
+        }
+        var minX = first.1.x, maxX = first.1.x
+        var minY = first.1.y, maxY = first.1.y
+        for (_, point) in projected {
+            minX = min(minX, point.x); maxX = max(maxX, point.x)
+            minY = min(minY, point.y); maxY = max(maxY, point.y)
+        }
+
+        // Fit the figure's own extent, then centre that extent in the box.
+        let inset: CGFloat = 30
+        let scale = min(
+            (size.width - inset * 2) / max(maxX - minX, 0.001),
+            (size.height - inset * 2) / max(maxY - minY, 0.001)
+        )
+        let midX = (minX + maxX) / 2
+        let midY = (minY + maxY) / 2
+
+        placed = Dictionary(uniqueKeysWithValues: projected.map { hr, point in
+            (hr, CGPoint(
+                x: size.width / 2 - (point.x - midX) * scale,
+                y: size.height / 2 - (point.y - midY) * scale
+            ))
+        })
+    }
+
+    func point(_ star: Star) -> CGPoint {
+        placed[star.hr] ?? .zero
     }
 }
