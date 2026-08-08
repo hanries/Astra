@@ -104,8 +104,12 @@ struct TodayView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu("Debug", systemImage: "ladybug") {
                         Button("Seed 60 days") { act { try DebugSeed.fill(context: context) } }
+                        Button("Show onboarding") { DebugSeed.replayOnboarding() }
                         Button("Clear all", role: .destructive) {
                             act { try DebugSeed.clear(context: context) }
+                        }
+                        Button("Reset to new install", role: .destructive) {
+                            act { try DebugSeed.resetEverything(context: context) }
                         }
                     }
                 }

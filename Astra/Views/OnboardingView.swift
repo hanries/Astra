@@ -12,6 +12,12 @@ import SwiftData
 /// yields to one star. Advancing is a tap anywhere, so the flow never asks the
 /// user to find a button.
 struct OnboardingView: View {
+    /// Whether the flow has been through once.
+    ///
+    /// Named here rather than written as a literal at each use, so the debug
+    /// action that clears it can't drift from the check that reads it.
+    static let seenKey = "hasSeenFirstLight"
+
     let progression: SkyProgression
     let onFinish: () -> Void
 
@@ -136,41 +142,49 @@ struct OnboardingView: View {
 
     // MARK: - Sun
 
+    /// Words gathered close under the Sun, high on the screen, with the rest of
+    /// the sky left dark below them. The empty half is the point: that's the
+    /// part still to fill.
     private var sunContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer()
-            PhaseCopy(
-                headline: "This is our Sun, and where your universe begins.",
-                detail: "Your sky fills outward from here. Its position comes from your time zone — Astra never asks where you live."
-            )
-            .padding(.bottom, 8)
-            TapHint(opacity: 1)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                Spacer().frame(height: geometry.size.height * 0.44)
+                PhaseCopy(
+                    headline: "This is our Sun, and where your universe begins.",
+                    detail: "Your sky fills outward from here. Astra works out roughly where you're standing from your time zone, so it never has to ask where you live.",
+                    alignment: .center
+                )
+                .shielded()
+                Spacer()
+                TapHint(opacity: 1)
+            }
         }
         .transition(.opacity)
     }
 
     // MARK: - One star
 
+    /// The star takes the middle and the words sit right at the bottom edge,
+    /// small. Nothing competes with the thing catching light.
     private var oneStarContent: some View {
         VStack(spacing: 0) {
             Spacer()
             if let firstStar {
                 Ignition(star: firstStar.star)
-                    .frame(height: 200)
+                    .frame(height: 230)
                 Text(firstStar.star.displayName)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Theme.starlight)
-                    .padding(.top, 4)
             }
             Spacer()
             PhaseCopy(
-                headline: "Keep everything you set out to, and a star lights.",
-                // The forgiveness rule belongs here, at the moment the mechanic
-                // is introduced, rather than being discovered on the first bad
-                // day. It's also the sentence that separates this from a streak.
-                detail: "One a day, at most. Miss one and nothing is taken back — you simply don't light one that night."
+                headline: "Keep them all for a day and one star lights.",
+                // The forgiveness rule belongs here, where the mechanic is
+                // introduced, rather than being discovered on the first bad
+                // day. It's also the line that separates this from a streak.
+                detail: "One a day at most. Miss a day and you still keep every star you've already lit.",
+                alignment: .center
             )
-            .padding(.bottom, 8)
             TapHint(opacity: 1)
         }
         .transition(.opacity)
@@ -178,39 +192,50 @@ struct OnboardingView: View {
 
     // MARK: - Figures
 
+    /// The figure held high and off to one side, its name labelled against it
+    /// rather than titled beneath it, with the words in the opposite corner.
+    /// A diagonal, so this page doesn't sit where the last one sat.
     private var figuresContent: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            if let demonstrationFigure {
-                FigureDraw(constellation: demonstrationFigure)
-                    .frame(height: 200)
-                Text(demonstrationFigure.name)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(Theme.starlight)
-                    .padding(.top, 10)
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 0) {
+                if let demonstrationFigure {
+                    HStack(alignment: .top, spacing: 0) {
+                        Spacer(minLength: 0)
+                        VStack(alignment: .trailing, spacing: 8) {
+                            FigureDraw(constellation: demonstrationFigure)
+                                .frame(height: geometry.size.height * 0.30)
+                            Text(demonstrationFigure.name.uppercased())
+                                .font(Theme.label(10))
+                                .kerning(1.5)
+                                .foregroundStyle(Theme.subdued)
+                                .padding(.trailing, 6)
+                        }
+                        .frame(width: geometry.size.width * 0.82)
+                    }
+                    .padding(.top, geometry.size.height * 0.10)
+                }
+                Spacer()
+                PhaseCopy(
+                    headline: "Stars join into figures.",
+                    detail: figurePacingLine,
+                    alignment: .leading
+                )
+                TapHint(opacity: 1)
             }
-            Spacer()
-            PhaseCopy(
-                headline: "Stars join into figures.",
-                detail: figurePacingLine
-            )
-            .padding(.bottom, 8)
-            TapHint(opacity: 1)
         }
         .transition(.opacity)
     }
 
-    /// Pacing stated in days, from the real figures in this user's own order —
-    /// concrete beats an adjective, and these are numbers they can check later.
+    /// Pacing given in days, taken from the real figures in this user's own
+    /// order. Numbers they can check later beat an adjective.
     private var figurePacingLine: String {
         let ordered = progression.constellations
         guard let smallest = ordered.first,
               let largest = ordered.last else {
-            return "Small figures come first, larger ones later."
+            return "The small ones come first and the long ones come later."
         }
-        return "\(smallest.name) takes \(smallest.starCount) days. "
-            + "\(largest.name) takes \(largest.starCount). "
-            + "The small ones come first."
+        return "\(smallest.name) takes \(smallest.starCount) days and "
+            + "\(largest.name) takes \(largest.starCount), so the small ones come first."
     }
 
     // MARK: - Naming
@@ -260,7 +285,7 @@ struct OnboardingView: View {
                 .padding(.top, 6)
             }
 
-            Text("Five at most.")
+            Text("You can add up to five once you're in.")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.unlit)
 
@@ -504,20 +529,51 @@ private struct TapHint: View {
 private struct PhaseCopy: View {
     let headline: String
     let detail: String
+    var alignment: HorizontalAlignment = .leading
+
+    private var textAlignment: TextAlignment {
+        alignment == .center ? .center : .leading
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: alignment, spacing: 14) {
             Text(headline)
                 .font(.system(size: 23, weight: .regular))
                 .foregroundStyle(Theme.starlight)
+                .multilineTextAlignment(textAlignment)
                 .fixedSize(horizontal: false, vertical: true)
             Text(detail)
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.subdued)
                 .lineSpacing(3)
+                .multilineTextAlignment(textAlignment)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(
+            maxWidth: .infinity,
+            alignment: alignment == .center ? .center : .leading
+        )
+    }
+}
+
+private extension View {
+    /// A soft local darkening behind a block of words.
+    ///
+    /// Needed only where copy sits over the field at full brightness. The
+    /// page-wide bottom gradient can't help text placed high on the screen, and
+    /// a panel behind it would put a rectangle in the middle of the sky.
+    func shielded() -> some View {
+        background {
+            RadialGradient(
+                colors: [.black.opacity(0.9), .black.opacity(0.72), .clear],
+                center: .center,
+                startRadius: 0,
+                endRadius: 250
+            )
+            .blur(radius: 20)
+            .padding(-60)
+            .allowsHitTesting(false)
+        }
     }
 }
 

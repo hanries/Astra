@@ -7,7 +7,7 @@ struct AstraApp: App {
     /// the life of the install. See `SkyProgressionStore`.
     private let progression = SkyProgressionStore.load(catalog: .shared)
 
-    @AppStorage("hasSeenFirstLight") private var hasSeenFirstLight = false
+    @AppStorage(OnboardingView.seenKey) private var hasSeenFirstLight = false
 
     var body: some Scene {
         WindowGroup {

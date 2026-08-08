@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import SwiftData
+import SwiftUI
 
 /// Fills the store with plausible history so long-horizon views can be looked
 /// at without waiting months for them.
@@ -54,6 +55,24 @@ enum DebugSeed {
     /// completions, so the store rejects the delete. Removing each completion
     /// first, saving, then removing the habits works because by then nothing
     /// points at them.
+    /// Sends the app back to first launch.
+    ///
+    /// Only clears the seen flag — the frozen sky order and anything already
+    /// tracked stay put, so the flow can be replayed against real data. For a
+    /// true cold start, clear first and then replay.
+    static func replayOnboarding() {
+        UserDefaults.standard.set(false, forKey: OnboardingView.seenKey)
+    }
+
+    /// Everything back to a genuinely new install: habits, ledger, the frozen
+    /// sky order and the onboarding flag.
+    static func resetEverything(context: ModelContext) throws {
+        try clear(context: context)
+        UserDefaults.standard.removeObject(forKey: SkyProgressionStore.orderKey)
+        UserDefaults.standard.removeObject(forKey: SkyProgressionStore.anchorKey)
+        replayOnboarding()
+    }
+
     static func clear(context: ModelContext) throws {
         for completion in try context.fetch(FetchDescriptor<Completion>()) {
             context.delete(completion)
