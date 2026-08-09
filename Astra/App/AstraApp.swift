@@ -22,7 +22,9 @@ struct AstraApp: App {
             }
             .preferredColorScheme(.dark)
         }
-        .modelContainer(for: [Habit.self, Completion.self, Award.self])
+        // The shared group container, not the app's private one, so the widget
+        // is reading the same habits rather than an empty store of its own.
+        .modelContainer(AstraStore.container)
     }
 }
 

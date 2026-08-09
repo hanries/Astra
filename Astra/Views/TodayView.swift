@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
 
 /// The home tab: today's habits, and the star each kept day lights.
 ///
@@ -379,6 +380,40 @@ struct TodayView: View {
             nextStarName: nextStarName,
             isTodayComplete: isTodayComplete
         )
+        publishToWidget()
+    }
+
+    private func publishToWidget() {
+        AstraStore.publish(
+            AstraStore.UpcomingRun(base: awards.count, unlocks: upcomingUnlocks(from: awards.count))
+        )
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// The next several unlocks, not just tomorrow's.
+    ///
+    /// The widget can mark the last habit of a day itself, which lights a star
+    /// with the app never launched, and it has no catalogue to name the one
+    /// after. Publishing a run of them lets it keep up on its own.
+    ///
+    /// The loop stops at the first gap rather than skipping it, so an entry's
+    /// position in the list stays its award ordinal.
+    private func upcomingUnlocks(from base: Int) -> [AstraStore.Unlock] {
+        var unlocks: [AstraStore.Unlock] = []
+        for offset in 0..<AstraStore.upcomingDepth {
+            let ordinal = base + offset
+            guard let next = progression.star(forOrdinal: ordinal) else { break }
+            let figure = progression.active(awardCount: ordinal)?.constellation ?? next.constellation
+            unlocks.append(
+                AstraStore.Unlock(
+                    star: next.star.displayName,
+                    figure: figure.name,
+                    lit: progression.active(awardCount: ordinal)?.litCount ?? 0,
+                    total: figure.starCount
+                )
+            )
+        }
+        return unlocks
     }
 
     /// Offers reminders once, just after the first star.
