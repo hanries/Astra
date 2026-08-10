@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Astra collects nothing and sends nothing. Every habit, day and star lives
+     in a SwiftData store on the device, in an App Group the app and its widget
+     share. There is no account, no analytics, no networking of any kind: the
+     star catalogue ships in the bundle, so even the sky is drawn offline.
+
+     The only entry below is UserDefaults, which Apple asks apps to declare a
+     reason for. Both reasons apply: CA92.1 for what the app keeps to itself,
+     and 1C8F.1 for the handful of values the widget has to read. -->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- Settings only this app reads: whether onboarding has been
+				     seen, the frozen sky progression, reminder time. -->
+				<string>CA92.1</string>
+				<!-- The App Group the widget shares: the store's location and
+				     the run of upcoming unlocks it indexes into. -->
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
