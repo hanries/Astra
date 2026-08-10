@@ -112,22 +112,24 @@ def render() -> bytearray:
             # centre. Measured from the centre it has already decayed to
             # almost nothing by the time it clears the disc, which leaves a
             # hard-edged ball that reads as a moon instead of a star.
-            if r < corona_r:
-                beyond = max(0.0, (r - disc_r) / (corona_r - disc_r))
-                halo = (1 - beyond) ** 2.8 * 0.50
+            #
+            # One curve all the way out, rather than a corona plus a separate
+            # far wash. Split in two they meet at CORONA_RADIUS at different
+            # values -- the inner one has reached zero, the outer one starts at
+            # 0.055 -- and that step draws a hard circle around the star,
+            # visible at the size the App Store renders this. The exponential
+            # passes through 0.055 where the old wash began, so the glow keeps
+            # its reach without the seam.
+            #
+            # Applied inside the disc too. `beyond` clamps at the rim, so the
+            # disc's antialiased edge blends down onto lit ground instead of
+            # onto bare background, which would outline it.
+            beyond = max(0.0, (r - disc_r) / (corona_r - disc_r))
+            halo = 0.50 * math.exp(-2.2 * beyond)
+            if halo > 0.0008:
                 red = min(255, int(red + TINT[0] * 255 * halo))
                 green = min(255, int(green + TINT[1] * 255 * halo))
                 blue = min(255, int(blue + TINT[2] * 255 * halo))
-            else:
-                # A wider, much fainter wash so the glow doesn't stop on a
-                # line. Kept low: any more and the whole frame goes grey and
-                # the star loses its darkness to sit against.
-                far = max(0.0, 1 - (r - corona_r) / (SIZE * 0.13))
-                if far > 0:
-                    wash = far ** 3.0 * 0.055
-                    red = min(255, int(red + TINT[0] * 255 * wash))
-                    green = min(255, int(green + TINT[1] * 255 * wash))
-                    blue = min(255, int(blue + TINT[2] * 255 * wash))
 
             if r < disc_r:
                 normalised = r / disc_r
