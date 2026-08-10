@@ -75,7 +75,11 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            // The same ground as the launch screen and as the app proper, not
+            // pure black. It is a difference of ten values, and it is the
+            // difference between the system's still dissolving into this and
+            // the whole screen stepping a shade darker as it does.
+            Theme.background.ignoresSafeArea()
 
             DuskField(
                 stars: duskStars,
@@ -85,6 +89,20 @@ struct OnboardingView: View {
                 showsSun: phase == .sun
             )
             .ignoresSafeArea()
+
+            // Whatever the system was showing a moment ago, still showing.
+            // Drawn here rather than inside `content` so it is measured against
+            // the whole screen, as the storyboard's constraints are.
+            if phase == .dusk {
+                TimelineView(.animation) { timeline in
+                    let t = timeline.date.timeIntervalSince(startedAt)
+                    LaunchMark(
+                        sunOpacity: 1 - ramp(t, from: DuskField.sunFadesAt,
+                                             over: DuskField.sunFadesOver)
+                    )
+                }
+                .transition(.opacity)
+            }
 
             // Words never sit straight on the field. A star landing behind a
             // line of type is the failure mode of every interface built over
@@ -121,23 +139,18 @@ struct OnboardingView: View {
 
     // MARK: - Dusk
 
-    /// The title arrives by letterspacing open as it fades, which is a move the
-    /// type can make on its own — no logo, no mark, nothing drawn.
+    /// Only the hint. The title is already on screen when this phase begins —
+    /// the system put it there — and `LaunchMark` keeps it there. It used to
+    /// arrive by letterspacing open as it fades, which was a good move for the
+    /// type to make, but the launch screen now says the word first and no
+    /// opening is worth saying it twice.
     private var duskContent: some View {
         TimelineView(.animation) { timeline in
             let t = timeline.date.timeIntervalSince(startedAt)
-            let titleIn = ramp(t, from: DuskField.titleAt, over: 1.4)
-            let hintIn = ramp(t, from: DuskField.titleAt + 1.9, over: 0.9)
 
             VStack {
                 Spacer()
-                Text("ASTRA")
-                    .font(.system(size: 25, weight: .light))
-                    .kerning(6 + 12 * titleIn)
-                    .foregroundStyle(Theme.starlight)
-                    .opacity(titleIn)
-                Spacer()
-                TapHint(opacity: hintIn)
+                TapHint(opacity: ramp(t, from: DuskField.hintAt, over: 0.9))
             }
         }
     }
@@ -290,7 +303,7 @@ struct OnboardingView: View {
         case .dusk:
             // Ignore taps until the field has actually come out; tapping
             // through the opening would skip the only thing it's there to show.
-            guard Date.now.timeIntervalSince(startedAt) > DuskField.titleAt else { return }
+            guard Date.now.timeIntervalSince(startedAt) > DuskField.settlesAt else { return }
             move(to: .sun)
         case .sun:
             move(to: .oneStar)
@@ -341,13 +354,22 @@ struct DuskField: View {
     let dimmed: Bool
     let showsSun: Bool
 
-    /// Held still before anything happens, so the black reads as deliberate.
-    static let blackFor: TimeInterval = 0.7
+    /// Held still before anything happens, so the mark the launch screen left
+    /// on screen gets a moment of its own before the sky starts arriving.
+    static let holdFor: TimeInterval = 0.7
     /// How long the whole sky takes to come out.
     static let duskOver: TimeInterval = 3.8
-    /// When the title starts to arrive — while the sky is still filling, so the
-    /// two overlap rather than queue.
-    static let titleAt: TimeInterval = 2.4
+    /// When the sun starts to go, and how long it takes. It leaves while the
+    /// sky is still filling, so the two overlap rather than queue, and the
+    /// phase ends on stars rather than on the thing it opened with. The Sun
+    /// comes back as itself, labelled and to scale, in the next phase.
+    static let sunFadesAt: TimeInterval = 1.2
+    static let sunFadesOver: TimeInterval = 2.0
+    /// When the sky is far enough out to invite a tap.
+    static let hintAt: TimeInterval = 3.6
+    /// Taps before this are ignored — going straight through the opening skips
+    /// the only thing it is there to show.
+    static let settlesAt: TimeInterval = 2.4
 
     var body: some View {
         TimelineView(.animation) { timeline in
@@ -431,7 +453,7 @@ struct DuskField: View {
                 radius: Theme.starRadius(magnitude: star.magnitude) * 0.85,
                 colour: Theme.starColor(bv: star.colorIndex),
                 alpha: star.magnitude < 3.5 ? 0.95 : 0.55,
-                appearsAt: blackFor + progress * duskOver
+                appearsAt: holdFor + progress * duskOver
             )
         }
     }

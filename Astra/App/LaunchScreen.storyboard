@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="ast-la-unc">
+    <!-- LaunchMark is the sun and the word flattened onto the background. It is
+         flattened on purpose: an image view in a launch storyboard will not draw
+         an asset that carries alpha. It lays out and sizes correctly and then
+         renders nothing, which is a hard failure to read. Onboarding has no such
+         limit and composes LaunchSun and LaunchWord itself, which it needs to,
+         because there it sits over a starfield rather than a flat colour.
+
+         The lockup's centre sits at 0.45 of the screen's height, since a group
+         centred on the true middle reads low, and 0.9 of the view's own centre
+         is that same 0.45. The mark is built with its lockup centred in the
+         canvas, so centring the image centres the lockup.
+
+         Onboarding opens on this same arrangement, which is what makes the
+         handoff out of the launch screen invisible. See LaunchMark.swift, and
+         Tools/make_launch_mark.swift, which prints the offsets both use. -->
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23503"/>
         <capability name="Named colors" minToolsVersion="9.0"/>
@@ -30,7 +45,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchMark" width="299" height="371"/>
+        <image name="LaunchMark" width="299" height="370"/>
         <namedColor name="LaunchBackground">
             <color red="0.039215686274509803" green="0.050980392156862744" blue="0.078431372549019607" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
