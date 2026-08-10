@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astra — Support</title>
+<meta name="description" content="Support and answers for Astra, a habit tracker that lights one real star for every day you keep.">
+<link rel="icon" href="mark.png">
+<style>
+  :root {
+    --ground: #0A0D14;
+    --starlight: #EDEFF7;
+    --subdued: #8C94A8;
+    --unlit: #414A5E;
+    --rule: #293040;
+    --sun: #C9902F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 24px 96px;
+    background: var(--ground);
+    color: var(--starlight);
+    font: 400 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 34rem; margin: 0 auto; }
+  header { text-align: center; padding: 56px 0 8px; }
+  header img { width: 132px; height: auto; display: block; margin: 0 auto; }
+  .label {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--subdued); font-weight: 500;
+  }
+  header .label { margin-top: 4px; }
+  h1 {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  h2 {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--subdued); font-weight: 500;
+    margin: 56px 0 0; padding-bottom: 10px; border-bottom: 1px solid var(--rule);
+  }
+  .entry { padding: 22px 0; border-bottom: 1px solid rgba(41, 48, 64, 0.55); }
+  .entry h3 { font-size: 17px; font-weight: 500; margin: 0 0 6px; }
+  .entry p { margin: 0; color: #C3C9D8; }
+  .entry p + p { margin-top: 10px; }
+  a { color: var(--starlight); text-decoration: none; border-bottom: 1px solid var(--unlit); }
+  a:hover { border-bottom-color: var(--sun); }
+  .lede { color: #C3C9D8; margin: 28px 0 0; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--unlit); font-size: 13px; }
+  footer a { color: var(--subdued); border-bottom-color: transparent; }
+  footer a:hover { border-bottom-color: var(--unlit); }
+  @media (max-width: 480px) {
+    body { font-size: 16px; padding: 0 20px 72px; }
+    header { padding-top: 40px; }
+    header img { width: 112px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <img src="mark.png" alt="">
+  <h1>Astra</h1>
+  <p class="label">Support</p>
+</header>
+
+<p class="lede">
+  Astra is a habit tracker. Keep what you said you would for a day and it lights
+  one star, taken from a catalogue of real ones, in the sky above where you
+  started using it. Below are the questions that come up most. If yours isn't
+  here, there's a link at the bottom.
+</p>
+
+<h2>Stars and constellations</h2>
+
+<div class="entry">
+  <h3>How do I unlock a star?</h3>
+  <p>Mark every habit you're tracking as kept for that day. One completed day
+  lights one star. Marking some but not all of them doesn't light a partial
+  star, and no amount of extra effort on one day lights two.</p>
+</div>
+
+<div class="entry">
+  <h3>What happens if I miss a day?</h3>
+  <p>Nothing is taken away. Stars you've already lit stay lit, permanently.
+  A missed day is a star you didn't light, and that's the whole of it.</p>
+</div>
+
+<div class="entry">
+  <h3>Why isn't there a streak counter?</h3>
+  <p>Because a number that resets to zero punishes you at the exact moment
+  you're most likely to give up. The Log tab shows your longest run instead,
+  which is a record you've set rather than a thing you can break.</p>
+</div>
+
+<div class="entry">
+  <h3>Why did I get a small constellation first?</h3>
+  <p>Constellations arrive nearest-first and smallest-first, so the early ones
+  finish in a couple of days and the later ones take a couple of weeks. The
+  order is fixed the first time you open the app, based on the sky where you
+  were standing, and it doesn't change afterwards.</p>
+</div>
+
+<div class="entry">
+  <h3>Are these real stars?</h3>
+  <p>Yes. Positions, brightnesses and colours come from the Yale Bright Star
+  Catalogue, and a star's colour on the map is worked out from its measured
+  colour index. Where a distance is shown, it's one we trust; where the
+  catalogue's parallax isn't reliable enough, Astra says nothing rather than
+  printing a number that's wrong.</p>
+</div>
+
+<h2>Habits</h2>
+
+<div class="entry">
+  <h3>How many habits can I track?</h3>
+  <p>Five at once. The limit is deliberate: every habit you add is one more
+  thing that has to be true before a day counts.</p>
+</div>
+
+<div class="entry">
+  <h3>Can I remove a habit?</h3>
+  <p>Open the menu on the Today tab and choose Manage habits. A habit you've
+  never logged is deleted outright. One with history is archived instead, so
+  the days you did keep it stay in the Log and the stars they earned stay in
+  the sky.</p>
+</div>
+
+<div class="entry">
+  <h3>Can I fill in a day I forgot to mark?</h3>
+  <p>Yes. Use the date strip at the top of the Today tab to go back and mark it.
+  You can't mark a day from before you added the habit.</p>
+</div>
+
+<h2>Reminders and the widget</h2>
+
+<div class="entry">
+  <h3>How do I turn on reminders?</h3>
+  <p>Menu on the Today tab, then Reminders. You pick the time, and one arrives
+  a day. Nothing arrives on a day you've already finished.</p>
+</div>
+
+<div class="entry">
+  <h3>How do I add the widget?</h3>
+  <p>Touch and hold an empty part of your Home Screen, tap Edit, then Add
+  Widget, and search for Astra. The small size shows the day's count and the
+  star waiting. The medium size lets you mark habits without opening the app.</p>
+</div>
+
+<div class="entry">
+  <h3>The widget looks out of date.</h3>
+  <p>iOS decides when widgets refresh, so it can lag by a few minutes. Opening
+  Astra brings it up to date immediately.</p>
+</div>
+
+<h2>Your data</h2>
+
+<div class="entry">
+  <h3>Where is my data kept?</h3>
+  <p>On your device, and nowhere else. Astra has no account, no server and no
+  networking of any kind. Nothing you record leaves the phone. See the
+  <a href="privacy.html">privacy policy</a> for the long version.</p>
+</div>
+
+<div class="entry">
+  <h3>How do I delete everything?</h3>
+  <p>Delete the app. Everything it stored goes with it, and there's no copy
+  anywhere for us to hold on to.</p>
+</div>
+
+<div class="entry">
+  <h3>Will my sky move to a new phone?</h3>
+  <p>If you restore the new phone from a backup of the old one, yes. There's no
+  sync, so two phones set up separately keep two separate skies.</p>
+</div>
+
+<h2>Still stuck</h2>
+
+<div class="entry">
+  <h3>Ask a question or report a bug</h3>
+  <p><a href="https://github.com/hanries/Astra/issues/new">Open an issue on
+  GitHub</a>. Tell me what you did, what you expected, and what happened
+  instead. If it's a display problem, a screenshot helps more than anything.</p>
+</div>
+
+<footer>
+  Astra is free, with no ads and no subscription.
+  <a href="https://github.com/hanries/Astra">Source on GitHub</a> ·
+  <a href="privacy.html">Privacy</a>
+</footer>
+
+</div>
+</body>
+</html>
