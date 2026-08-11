@@ -301,9 +301,15 @@ panel("01-loop") { context in
 
 // 2. The reason to keep going, and the only claim here that needs two separate
 //    captures to make honestly.
+//
+//    The supporting line exists to head off the subtraction. Thirty-eight stars
+//    across sixty days looks like the arithmetic is wrong until you know a day
+//    only counts when every habit is marked, and that the seeded history misses
+//    twenty-three days. Leaving the reader to work that out is worse than
+//    spending a line on it.
 panel("02-grows") { context in
     let y = heading(context, "The same install", "One star on day one.\nThirty-eight by sixty.",
-                    "Thirteen constellations completed in between.")
+                    "Thirty-eight days kept, and a star for each one.")
     drawTag("Day 1", in: context, top: y + 62, x: 18)
     drawScreen(skyDay1, in: context, x: 18, top: y + 92, width: 196)
     drawTag("Day 60", in: context, top: y + 62, x: 228)
