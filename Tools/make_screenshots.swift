@@ -96,13 +96,46 @@ func drawField(in context: CGContext) {
 
 // MARK: - Type
 
+/// New York, which ships with the system.
+///
+/// The headlines were set in the plain system sans and read as a default rather
+/// than as a decision. Astra's whole interface is a printed star atlas: hairline
+/// rules, margin labels, figures set in a monospace. A serif display over a sans
+/// label is the pairing that grammar already implies.
+func display(_ size: Double, _ weight: NSFont.Weight = .semibold) -> NSFont {
+    let base = NSFont.systemFont(ofSize: size, weight: weight)
+    guard let descriptor = base.fontDescriptor.withDesign(.serif) else { return base }
+    return NSFont(descriptor: descriptor, size: size) ?? base
+}
+
+/// The largest size at or below `size` whose longest line still fits the column.
+///
+/// Cheaper than hand-tuning every headline, and it means a caption can be
+/// rewritten later without quietly running off the edge of the canvas.
+func fitted(_ text: String, _ size: Double, kern: Double, width: Double) -> Double {
+    var trial = size
+    while trial > 20 {
+        let font = display(trial * scale)
+        let widest = text.split(separator: "\n").map { line -> Double in
+            let attributed = NSAttributedString(string: String(line),
+                                                attributes: [.font: font, .kern: kern * scale])
+            return CTLineGetTypographicBounds(
+                CTLineCreateWithAttributedString(attributed), nil, nil, nil)
+        }.max() ?? 0
+        if widest <= width * scale { return trial }
+        trial -= 0.5
+    }
+    return trial
+}
+
 @discardableResult
 func draw(
     _ text: String, in context: CGContext, top: Double,
     size: Double, weight: NSFont.Weight, colour textColour: NSColor,
-    kern: Double = 0, leading: Double = 1.22, x: Double = margin
+    kern: Double = 0, leading: Double = 1.22, x: Double = margin, serif: Bool = false
 ) -> Double {
-    let font = NSFont.systemFont(ofSize: size * scale, weight: weight)
+    let font = serif ? display(size * scale, weight)
+                     : NSFont.systemFont(ofSize: size * scale, weight: weight)
     var y = top
     for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
         let attributed = NSAttributedString(string: String(line), attributes: [
@@ -230,8 +263,9 @@ func panel(_ name: String, _ body: (CGContext) -> Void) {
 func heading(_ context: CGContext, _ label: String, _ head: String, _ sub: String) -> Double {
     var y = draw(label.uppercased(), in: context, top: 76, size: 12, weight: .semibold,
                  colour: subdued, kern: 2.6, leading: 1.9)
-    y = draw(head, in: context, top: y + 4, size: 41, weight: .semibold,
-             colour: starlight, kern: -1.0, leading: 1.14)
+    let size = fitted(head, 44, kern: -0.6, width: pointW - margin * 2)
+    y = draw(head, in: context, top: y + 6, size: size, weight: .semibold,
+             colour: starlight, kern: -0.6, leading: 1.12, serif: true)
     y = draw(sub, in: context, top: y + 12, size: 16, weight: .regular,
              colour: subdued, leading: 1.35)
     return y
@@ -268,8 +302,8 @@ panel("01-loop") { context in
 // 2. The reason to keep going, and the only claim here that needs two separate
 //    captures to make honestly.
 panel("02-grows") { context in
-    let y = heading(context, "It grows", "Sixty days ago,\nthis sky was empty.",
-                    "Every day you keep adds one more star.")
+    let y = heading(context, "The same install", "One star on day one.\nThirty-eight by sixty.",
+                    "Thirteen constellations completed in between.")
     drawTag("Day 1", in: context, top: y + 62, x: 18)
     drawScreen(skyDay1, in: context, x: 18, top: y + 92, width: 196)
     drawTag("Day 60", in: context, top: y + 62, x: 228)
