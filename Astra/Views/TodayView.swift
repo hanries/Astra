@@ -109,6 +109,9 @@ struct TodayView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu("Debug", systemImage: "ladybug") {
                         Button("Seed 60 days") { act { try DebugSeed.fill(context: context) } }
+                        Button("Seed 60 perfect days") {
+                            act { try DebugSeed.fill(context: context, keepRate: 1) }
+                        }
                         Button("Show onboarding") { DebugSeed.replayOnboarding() }
                         Button("Clear all", role: .destructive) {
                             act { try DebugSeed.clear(context: context) }

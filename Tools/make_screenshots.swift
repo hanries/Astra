@@ -10,16 +10,17 @@
 //      half-drained battery:
 //        xcrun simctl status_bar <udid> override --time 9:41 \
 //          --batteryState charged --batteryLevel 100 --wifiBars 3 --cellularBars 4
-//   3. Install a DEBUG build, run onboarding, add a second habit, then use the
-//      debug menu's "Seed 60 days". An empty sky makes a poor case for an app
-//      about filling one.
+//   3. Install a DEBUG build, add two habits, then use the debug menu's
+//      "Seed 60 perfect days". The ordinary seed misses about a third of the
+//      days, which left thirty-eight stars over sixty-one days and quietly
+//      contradicted the one-star-a-day rule the captions state.
 //   4. Install a RELEASE build over the top. The data container survives and
 //      the debug menu's ladybug leaves the toolbar, which a reviewer would
 //      otherwise find sitting in the corner of two panels.
 //   5. Capture with `xcrun simctl io <udid> screenshot`.
 //   6. For sky-day1, uninstall, reinstall, set hasSeenFirstLight, add one habit
-//      and mark it. One star against thirty-eight is the whole argument for the
-//      app, and it has to be a real capture.
+//      and mark it. One star against sixty-one is the whole argument for the
+//      app, and both sides have to be real captures.
 //
 // The panels put the app's own instruments on the page: the star portrait, the
 // widget, the size comparison, the stats rule. That is what there is to look
@@ -275,13 +276,13 @@ let rawDirectory = CommandLine.arguments[1]
 let outDirectory = CommandLine.arguments[2]
 try? FileManager.default.createDirectory(atPath: outDirectory, withIntermediateDirectories: true)
 
-let today = load("\(rawDirectory)/today.png")!
+let today = load("\(rawDirectory)/today-perfect.png")!
 let unlock = load("\(rawDirectory)/unlock.png")!
-let sky = load("\(rawDirectory)/sky.png")!
+let sky = load("\(rawDirectory)/sky-perfect.png")!
 let skyDay1 = load("\(rawDirectory)/sky-day1.png")!
 let star = load("\(rawDirectory)/star.png")!
-let log = load("\(rawDirectory)/log.png")!
-let widget = load("\(rawDirectory)/widget.png")!
+let log = load("\(rawDirectory)/log-perfect.png")!
+let widget = load("\(rawDirectory)/widget-perfect.png")!
 let sun = load("\(rawDirectory)/sun.png")!
 let word = load("\(rawDirectory)/word.png")!
 
@@ -302,17 +303,17 @@ panel("01-loop") { context in
 // 2. The reason to keep going, and the only claim here that needs two separate
 //    captures to make honestly.
 //
-//    The supporting line exists to head off the subtraction. Thirty-eight stars
-//    across sixty days looks like the arithmetic is wrong until you know a day
-//    only counts when every habit is marked, and that the seeded history misses
-//    twenty-three days. Leaving the reader to work that out is worse than
-//    spending a line on it.
+//    The history behind this is a perfect run, seeded at a keep rate of one, so
+//    the count on screen is exactly the number of days elapsed. An earlier pass
+//    used the ordinary seed, which misses about a third of the days, and left
+//    thirty-eight stars across sixty-one days. It read as broken arithmetic
+//    rather than as a realistic user, and no supporting line rescued it.
 panel("02-grows") { context in
-    let y = heading(context, "The same install", "One star on day one.\nThirty-eight by sixty.",
-                    "Thirty-eight days kept, and a star for each one.")
+    let y = heading(context, "The same install", "One star on day one.\nSixty-one two months in.",
+                    "A star for every day you keep them all.")
     drawTag("Day 1", in: context, top: y + 62, x: 18)
     drawScreen(skyDay1, in: context, x: 18, top: y + 92, width: 196)
-    drawTag("Day 60", in: context, top: y + 62, x: 228)
+    drawTag("Day 61", in: context, top: y + 62, x: 228)
     drawScreen(sky, in: context, x: 228, top: y + 92, width: 196)
     drawPiece(sky, in: context, from: crop(14, 122, 412, 74),
               x: 40, top: y + 560, width: 360, pad: 12)

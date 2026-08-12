@@ -13,6 +13,10 @@ enum DebugSeed {
 
     /// Backdates the habits and marks `days` of history, keeping roughly
     /// `keepRate` of them so the calendar shows gaps rather than a perfect wall.
+    ///
+    /// A rate of 1 fills every day instead, which is the run the store
+    /// screenshots use: one star per day with nothing missed, so the count on
+    /// screen matches the rule the captions state.
     static func fill(
         context: ModelContext,
         days: Int = 60,
