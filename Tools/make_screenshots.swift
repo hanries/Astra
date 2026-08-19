@@ -319,14 +319,23 @@ panel("02-grows") { context in
               x: 40, top: y + 560, width: 360, pad: 12)
 }
 
-// 3. What it costs, said plainly and then itemised.
+// 3. What the app does not do with your data.
+//
+//    This panel used to be about the price, and that is why the first
+//    submission was rejected under 2.3.7: screenshots may not reference price,
+//    and Apple counts "free" as a price reference. "Every feature from the
+//    first day" counted too, since it implies nothing is behind a paywall. All
+//    of it moved to the description, which is where Apple says it belongs.
+//
+//    Privacy is the claim left standing, and it is a stronger one anyway: an
+//    account is not a price, and neither is an absent network stack.
 //
 //    The mark goes down as the two transparent pieces rather than the flattened
 //    one: the flattened copy carries its own background, which would sit on the
 //    field behind it as a dark rectangle.
-panel("03-free") { context in
-    let y = heading(context, "Free", "Free, with nothing\nto buy inside.",
-                    "No ads, no subscription, and no account to make.")
+panel("03-private") { context in
+    let y = heading(context, "Private", "Nothing you record\nleaves your phone.",
+                    "No account, no analytics, no connection needed.")
     let k = 210.0 / 299.0                 // the mark's canvas, scaled down
     let centreY = y + 186
     context.draw(sun, in: rect(pointW / 2 - 105, centreY - 105, 210, 210))
@@ -334,9 +343,9 @@ panel("03-free") { context in
                                 152 * k, 22 * k))
 
     var line = y + 372
-    for entry in ["Every feature, from the first day",
-                  "No sign-up, no email, no profile",
-                  "Nothing you record leaves the phone"] {
+    for entry in ["No sign-up, no email, no profile",
+                  "No analytics and no third-party code",
+                  "The star catalogue ships inside the app"] {
         context.setFillColor(ruleFaint)
         context.fill(rect(margin, line, pointW - margin * 2, 1))
         draw(entry, in: context, top: line + 18, size: 17, weight: .regular, colour: starlight)
