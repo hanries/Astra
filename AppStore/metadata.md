@@ -106,14 +106,36 @@ Astra is free. There are no ads, no subscription, and no account to make. It con
 price reference; `Tools/make_screenshots.swift` holds the copy, so grep it
 before every submission.
 
-## Still open: 4.3.0
+## 4.3(a) — association with a terminated account
 
-The Resolution Center message covers 2.3.7 only. If 4.3 is raised again it is
-almost certainly clause (b), a saturated category, answered with a reply rather
-than a new build. The material for that reply: 1,584 catalogued stars shipped in
-the binary, colour and temperature computed from each star's measured B-V index,
-size compared against the Sun from spectral class, distances withheld where the
-parallax is not reliable, every star portrait and the icon rendered
-procedurally at run time, an azimuthal equidistant projection anchored once per
-install, no streak counter and awards never revoked, and an interactive widget
-over App Intents and a shared App Group.
+**This is not the saturated-category clause.** The Resolution Center message
+says Apple believes Astra "shares a similar binary, metadata, and/or concept as
+apps previously submitted by a terminated Apple Developer Program account".
+
+That is an account-level finding, not a submission-level one. No change to the
+binary, the screenshots or the metadata addresses it, and resubmitting the same
+build without replying does not either. It is answered in writing, and if the
+written reply fails, by appeal to the App Review Board.
+
+Apple associates accounts through device and network fingerprints, payment
+methods, phone numbers, email and postal addresses, and tax details, as well as
+through shared code. A shared machine, a shared network, or a relative's
+terminated account can all trigger it.
+
+### Evidence of original authorship, all publicly checkable
+
+| Claim | Where it is verifiable |
+|---|---|
+| Written from an empty repository | github.com/hanries/Astra, 30 commits, 31 July to 19 August 2026, one author |
+| No third-party code | Zero Swift Package references in the project file, no Podfile, no Cartfile, no SDKs |
+| No purchased or third-party art | `Tools/build_catalog.py`, `Tools/make_icon.py`, `Tools/make_launch_mark.swift` generate every asset from source |
+| Star portraits are not images | Rendered procedurally at run time from catalogue values |
+
+A public commit history showing an app being built from nothing, including its
+mistakes, is difficult evidence to fake and is the strongest thing available
+here.
+
+### Do not
+
+Do not open a second developer account to get around this. That is the exact
+pattern the guideline describes, and it would put both accounts at risk.
